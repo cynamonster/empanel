@@ -62,14 +62,14 @@ export const JurorCard: React.FC<JurorCardProps> = ({
     switch (juror.status) {
       case 'struck_plaintiff':
         return (
-          <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-blue-900/60 text-blue-300 border border-blue-700">
-            STRUCK (P)
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-rose-900/60 text-rose-300 border border-rose-700">
+            STRUCK (Pros)
           </span>
         );
       case 'struck_defense':
         return (
-          <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-rose-900/60 text-rose-300 border border-rose-700">
-            STRUCK (D)
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-blue-900/60 text-blue-300 border border-blue-700">
+            STRUCK (Def)
           </span>
         );
       case 'cause_granted':
@@ -95,10 +95,10 @@ export const JurorCard: React.FC<JurorCardProps> = ({
         if (juror.strikeIntent === 'strike_peremptory') {
           return (
             <span
-              className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-rose-950/80 text-rose-300 border border-rose-700/80"
+              className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-blue-950/80 text-blue-300 border border-blue-700/80"
               title={juror.strikeIntentNote ? `Note: ${juror.strikeIntentNote}` : 'Strike Plan: Peremptory'}
             >
-              PLAN: (P)
+              PLAN: (D)
             </span>
           );
         }
@@ -155,14 +155,14 @@ export const JurorCard: React.FC<JurorCardProps> = ({
       {/* Header: Seat / Juror # + Status / Rating */}
       <div className="flex items-center justify-between gap-1 mb-1.5">
         <div className="flex items-center space-x-1.5">
+          <span className="text-sm font-extrabold text-slate-100 font-mono tracking-tight">
+            #{juror.jurorNumber}
+          </span>
           {seatLabel && (
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-950/80 px-1 rounded border border-indigo-800/50">
               {seatLabel}
             </span>
           )}
-          <span className="text-sm font-extrabold text-slate-100 font-mono tracking-tight">
-            #{juror.jurorNumber}
-          </span>
         </div>
 
         <div className="flex items-center space-x-1.5">
@@ -187,29 +187,10 @@ export const JurorCard: React.FC<JurorCardProps> = ({
             <span>
               {juror.age ? `${juror.age}y` : ''}{juror.age && juror.gender ? ' • ' : ''}{juror.gender || ''}
             </span>
-            <span className="truncate max-w-[80px] text-slate-500 text-right">
-              {juror.cityOrZip || ''}
+            <span className="truncate max-w-[120px] text-slate-500 text-right">
+              {juror.cityState || juror.cityOrZip || ''}
             </span>
           </div>
-        </div>
-      )}
-
-      {/* Tags preview */}
-      {juror.tags && juror.tags.length > 0 && !compact && (
-        <div className="flex flex-wrap gap-1 mt-1.5 pt-1 border-t border-slate-800/60">
-          {juror.tags.slice(0, 2).map((tag, idx) => (
-            <span
-              key={idx}
-              className="text-[10px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700/60 truncate max-w-[90px]"
-            >
-              {tag}
-            </span>
-          ))}
-          {juror.tags.length > 2 && (
-            <span className="text-[9px] text-slate-500 self-center">
-              +{juror.tags.length - 2}
-            </span>
-          )}
         </div>
       )}
 

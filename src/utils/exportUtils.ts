@@ -12,8 +12,7 @@ export function exportJurorsToCSV(jurors: Juror[], caseName: string) {
     'Race/Ethnicity',
     'Occupation',
     'Employer',
-    'City/Zip',
-    'Tags',
+    'City, State',
     'Notes',
     'Cause / Strike Details'
   ];
@@ -29,8 +28,7 @@ export function exportJurorsToCSV(jurors: Juror[], caseName: string) {
     j.raceEthnicity ?? '',
     `"${(j.occupation || '').replace(/"/g, '""')}"`,
     `"${(j.employer || '').replace(/"/g, '""')}"`,
-    `"${(j.cityOrZip || '').replace(/"/g, '""')}"`,
-    `"${(j.tags || []).join('; ')}"`,
+    `"${(j.cityState || j.cityOrZip || '').replace(/"/g, '""')}"`,
     `"${(j.notes || '').replace(/"/g, '""')}"`,
     `"${(j.statusNotes || '').replace(/"/g, '""')}"`
   ]);

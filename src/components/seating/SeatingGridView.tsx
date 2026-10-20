@@ -61,8 +61,7 @@ export const SeatingGridView: React.FC = () => {
     const textMatches = !term ||
       j.jurorNumber.toLowerCase().includes(term) ||
       j.fullName.toLowerCase().includes(term) ||
-      (j.occupation && j.occupation.toLowerCase().includes(term)) ||
-      (j.tags && j.tags.some(t => t.toLowerCase().includes(term)));
+      (j.occupation && j.occupation.toLowerCase().includes(term));
 
     if (!textMatches) return false;
 

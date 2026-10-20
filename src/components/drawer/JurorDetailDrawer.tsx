@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useCase } from '../../context/CaseContext';
 import {
   X,
@@ -10,7 +10,6 @@ import {
   CheckCircle,
   HelpCircle,
   AlertTriangle,
-  Tag,
   FileText,
   User,
   MapPin,
@@ -36,30 +35,24 @@ export const JurorDetailDrawer: React.FC = () => {
     unseatJuror,
   } = useCase();
 
-  const [tagInput, setTagInput] = useState('');
   const [showCauseModal, setShowCauseModal] = useState(false);
   const [causeGrounds, setCauseGrounds] = useState('');
   const [causeRuling, setCauseRuling] = useState<'pending' | 'granted' | 'denied'>('granted');
 
+  const notesRef = useRef<HTMLTextAreaElement>(null);
+
   const juror = jurors.find(j => j.id === selectedJurorId);
+
+  useEffect(() => {
+    if (notesRef.current) {
+      notesRef.current.style.height = 'auto';
+      notesRef.current.style.height = `${Math.max(80, notesRef.current.scrollHeight)}px`;
+    }
+  }, [juror?.notes, juror?.id]);
+
   if (!juror) return null;
 
   const ratings = [-3, -2, -1, 0, 1, 2, 3];
-
-  const handleAddTag = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tagInput.trim()) return;
-    const current = juror.tags || [];
-    if (!current.includes(tagInput.trim())) {
-      updateJuror(juror.id, { tags: [...current, tagInput.trim()] });
-    }
-    setTagInput('');
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    const current = juror.tags || [];
-    updateJuror(juror.id, { tags: current.filter(t => t !== tagToRemove) });
-  };
 
   const isStruck = juror.status.startsWith('struck_') || juror.status === 'cause_granted';
 
@@ -128,22 +121,18 @@ export const JurorDetailDrawer: React.FC = () => {
           <div className="flex items-center justify-between">
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center space-x-1.5">
               <FileEdit className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Strike Plan (Notes to Self)</span>
+              <span>Plan to Strike?</span>
             </label>
             {juror.strikeIntent && juror.strikeIntent !== 'none' && (
               <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
                 juror.strikeIntent === 'strike_peremptory'
-                  ? 'bg-rose-950/70 border-rose-700/80 text-rose-300'
+                  ? 'bg-blue-950/70 border-blue-700/80 text-blue-300'
                   : 'bg-amber-950/70 border-amber-700/80 text-amber-300'
               }`}>
-                {juror.strikeIntent === 'strike_peremptory' ? 'Plan: Peremptory' : 'Plan: For Cause'}
+                {juror.strikeIntent === 'strike_peremptory' ? 'Peremptory' : 'For Cause'}
               </span>
             )}
           </div>
-
-          <p className="text-[11px] text-slate-400 leading-tight">
-            Record your private tactical assessment of whether to strike this juror:
-          </p>
 
           {/* 3 Intent Options */}
           <div className="grid grid-cols-3 gap-1.5">
@@ -163,11 +152,11 @@ export const JurorDetailDrawer: React.FC = () => {
               onClick={() => updateJuror(juror.id, { strikeIntent: 'strike_peremptory' })}
               className={`px-2 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center space-x-1 ${
                 juror.strikeIntent === 'strike_peremptory'
-                  ? 'bg-rose-950 border-rose-500 text-rose-200 ring-2 ring-rose-500/30 shadow'
-                  : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-rose-300 hover:bg-rose-950/30'
+                  ? 'bg-blue-950 border-blue-500 text-blue-200 ring-2 ring-blue-500/30 shadow'
+                  : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-blue-300 hover:bg-blue-950/30'
               }`}
             >
-              <Gavel className="w-3 h-3 text-rose-400" />
+              <Gavel className="w-3 h-3 text-blue-400" />
               <span>Peremptory</span>
             </button>
             <button
@@ -187,7 +176,7 @@ export const JurorDetailDrawer: React.FC = () => {
           {/* Optional Note */}
           <div className="space-y-1 pt-1">
             <span className="text-[10px] text-slate-400 uppercase font-semibold">
-              Optional Note on Reason / Bias:
+              Reason / Bias:
             </span>
             <textarea
               rows={2}
@@ -214,14 +203,20 @@ export const JurorDetailDrawer: React.FC = () => {
             </div>
           ) : juror.seatNumber !== undefined ? (
             <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-              <span className="text-[10px] text-slate-400">Currently Seated in Panel:</span>
               <div className="flex items-center space-x-1.5">
                 <button
                   onClick={() => recordPeremptoryStrike(juror.id, 'defense')}
-                  className="px-2 py-1 bg-rose-950/70 hover:bg-rose-900 border border-rose-700 text-rose-300 rounded text-[10px] font-semibold"
+                  className="px-2 py-1 bg-blue-950/70 hover:bg-blue-900 border border-blue-700 text-blue-300 rounded text-[10px] font-semibold"
                   title="Execute official defense peremptory strike in court"
                 >
                   Strike (Defense)
+                </button>
+                <button
+                  onClick={() => recordPeremptoryStrike(juror.id, 'plaintiff_prosecution')}
+                  className="px-2 py-1 bg-rose-950/70 hover:bg-rose-900 border border-rose-700 text-rose-300 rounded text-[10px] font-semibold"
+                  title={`Execute official ${activeCase?.caseType === 'criminal' ? 'prosecution' : 'plaintiff'} peremptory strike in court`}
+                >
+                  Strike ({activeCase?.caseType === 'criminal' ? 'Pros' : 'Plf'})
                 </button>
                 <button
                   onClick={() => setShowCauseModal(true)}
@@ -241,74 +236,31 @@ export const JurorDetailDrawer: React.FC = () => {
             <div className="font-semibold text-slate-200">
               {juror.seatNumber !== undefined
                 ? juror.isAlternate
-                  ? `Alternate Seat #${juror.seatNumber}`
-                  : `Prospective Panel Seat #${juror.seatNumber}`
-                : 'Not Seated (Jury Pool)'}
-            </div>
-            <div className="text-[11px] text-slate-400">
-              Status: <span className="font-mono capitalize">{juror.status.replace('_', ' ')}</span>
+                  ? `Alternate #${juror.seatNumber}`
+                  : `Prospective Juror #${juror.seatNumber}`
+                : 'Not in Jury Panel'}
             </div>
           </div>
-          {juror.seatNumber !== undefined && (
-            <button
-              onClick={() => unseatJuror(juror.id)}
-              className="text-xs text-rose-400 hover:text-rose-300 underline"
-            >
-              Unseat
-            </button>
-          )}
-        </div>
-
-        {/* SECTION: TAGS & BIAS FLAGS */}
-        <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-            Tags & Red Flags
-          </label>
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {(juror.tags || []).map((tag, idx) => (
-              <span
-                key={idx}
-                className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-200 text-xs"
-              >
-                <span>{tag}</span>
-                <button
-                  onClick={() => handleRemoveTag(tag)}
-                  className="text-slate-400 hover:text-rose-400"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-
-          <form onSubmit={handleAddTag} className="flex gap-1.5">
-            <input
-              type="text"
-              placeholder="Add tag (e.g. Prior Lawsuit, Engineer, Tort Bias)..."
-              value={tagInput}
-              onChange={e => setTagInput(e.target.value)}
-              className="flex-1 bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none"
-            />
-            <button
-              type="submit"
-              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </form>
         </div>
 
         {/* SECTION: RAPID NOTES */}
         <div>
           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-            Live Courtroom Notes
+            Notes
           </label>
           <textarea
-            rows={4}
+            ref={notesRef}
+            rows={3}
             placeholder="Type notes during questioning, demeanor observations, quotes..."
             value={juror.notes || ''}
-            onChange={e => updateJuror(juror.id, { notes: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-600 outline-none resize-none leading-relaxed"
+            onChange={e => {
+              updateJuror(juror.id, { notes: e.target.value });
+              if (notesRef.current) {
+                notesRef.current.style.height = 'auto';
+                notesRef.current.style.height = `${Math.max(72, notesRef.current.scrollHeight)}px`;
+              }
+            }}
+            className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-600 outline-none resize-none leading-relaxed overflow-hidden"
           />
         </div>
 
@@ -381,12 +333,12 @@ export const JurorDetailDrawer: React.FC = () => {
               />
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px]">City / Zip</span>
+              <span className="text-slate-500 block text-[10px]">City, State</span>
               <input
                 type="text"
-                value={juror.cityOrZip || ''}
-                onChange={e => updateJuror(juror.id, { cityOrZip: e.target.value })}
-                placeholder="e.g. Austin 78701"
+                value={juror.cityState || juror.cityOrZip || ''}
+                onChange={e => updateJuror(juror.id, { cityState: e.target.value })}
+                placeholder="e.g. Austin, TX"
                 className="w-full bg-slate-900 border border-slate-850 rounded px-2 py-1 text-slate-200 text-xs"
               />
             </div>

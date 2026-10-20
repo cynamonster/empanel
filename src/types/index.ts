@@ -18,6 +18,7 @@ export interface Juror {
   raceEthnicity?: string;
   occupation?: string;
   employer?: string;
+  cityState?: string;
   cityOrZip?: string;
   maritalStatus?: string;
   education?: string;
@@ -28,7 +29,7 @@ export interface Juror {
   status: JurorStatus;
   statusNotes?: string;
   notes: string;
-  tags: string[]; // e.g. "Tort Reform", "Prior Accident", "Engineer"
+  tags?: string[];
   
   // Tactical notes to self on strike intent
   strikeIntent?: 'none' | 'strike_peremptory' | 'strike_cause';

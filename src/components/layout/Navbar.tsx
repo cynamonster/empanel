@@ -4,6 +4,7 @@ import {
   Scale,
   Users,
   Grid,
+  UserPlus,
   Upload,
   Hand,
   Gavel,
@@ -78,7 +79,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => setShowCaseMenu(!showCaseMenu)}
             className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-sm font-medium transition-colors"
           >
-            <span className="truncate max-w-[160px] md:max-w-[240px] text-slate-200">
+            <span className="truncate max-w-[30rem] text-slate-200">
               {activeCase?.name || 'Select Case'}
             </span>
             <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
@@ -137,17 +138,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           )}
         </div>
-
-        {/* Unified Courtroom Workspace Indicator */}
-        {activeCase && (
-          <div className="hidden lg:flex items-center space-x-1.5 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700 text-xs text-slate-300 font-medium">
-            <Users className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Panel ({activeCase.boxSize})</span>
-            <span className="text-slate-600">•</span>
-            <Grid className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Venire Gallery</span>
-          </div>
-        )}
       </div>
 
       {/* Center/Right Action Toolbar */}
@@ -181,11 +171,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Gavel className="w-3.5 h-3.5 text-amber-400" />
           <div className="flex items-center space-x-2">
             <span className="font-semibold text-slate-300 hidden md:inline">Strikes:</span>
-            <span className="text-blue-400 font-mono font-medium" title="Plaintiff / Prosecution Remaining">
-              P: {pRemaining}/{activeCase?.plaintiffStrikesAllowed || 3}
+            <span
+              className="text-rose-400 font-mono font-medium"
+              title={`${activeCase?.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'} Remaining`}
+            >
+              {activeCase?.caseType === 'criminal' ? 'Pros' : 'P'}: {pRemaining}/{activeCase?.plaintiffStrikesAllowed || 3}
             </span>
             <span className="text-slate-600">|</span>
-            <span className="text-rose-400 font-mono font-medium" title="Defense Remaining">
+            <span className="text-blue-400 font-mono font-medium" title="Defense Remaining">
               D: {dRemaining}/{activeCase?.defenseStrikesAllowed || 3}
             </span>
           </div>
@@ -221,8 +214,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-xs text-slate-300 transition-colors"
           title="Import Juror Roster"
         >
-          <Upload className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="hidden sm:inline">Intake</span>
+          <UserPlus className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="hidden sm:inline">Add Jurors</span>
         </button>
 
         {/* Export Dropdown */}

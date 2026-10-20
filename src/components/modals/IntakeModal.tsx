@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useCase } from '../../context/CaseContext';
 import { parseDelimitedText, mapRowsToJurors } from '../../utils/csvParser';
 import { Upload, ClipboardList, Plus, FileText, Check, AlertCircle, Trash2 } from 'lucide-react';
@@ -23,6 +23,8 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
   const [manualAge, setManualAge] = useState('');
   const [manualGender, setManualGender] = useState('');
   const [manualCity, setManualCity] = useState('');
+
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen || !activeCase) return null;
 
@@ -62,11 +64,11 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
       occupation: manualOcc.trim() || undefined,
       age: manualAge.trim() || undefined,
       gender: manualGender.trim() || undefined,
+      cityState: manualCity.trim() || undefined,
       cityOrZip: manualCity.trim() || undefined,
       rating: 0,
       status: 'active',
       notes: '',
-      tags: [],
       responses: {},
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -81,6 +83,11 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
     setManualAge('');
     setManualGender('');
     setManualCity('');
+
+    // Reset focus to Full Name input for rapid entry
+    setTimeout(() => {
+      nameInputRef.current?.focus();
+    }, 0);
   };
 
   const handleConfirmImport = async () => {
@@ -212,6 +219,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
                 <div className="col-span-2">
                   <label className="text-[10px] text-slate-400 block mb-1">Full Name</label>
                   <input
+                    ref={nameInputRef}
                     type="text"
                     placeholder="e.g. Eleanor Vance"
                     value={manualName}
@@ -246,6 +254,16 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
                     placeholder="e.g. Female"
                     value={manualGender}
                     onChange={e => setManualGender(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none"
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="text-[10px] text-slate-400 block mb-1">City, State</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Austin, TX"
+                    value={manualCity}
+                    onChange={e => setManualCity(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none"
                   />
                 </div>
@@ -285,7 +303,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
                       <th className="p-2">Full Name</th>
                       <th className="p-2">Occupation</th>
                       <th className="p-2">Age/Gender</th>
-                      <th className="p-2">City/Zip</th>
+                      <th className="p-2">City, State</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-850">
@@ -295,7 +313,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
                         <td className="p-2 font-medium text-slate-200">{p.fullName}</td>
                         <td className="p-2 text-slate-400">{p.occupation || '—'}</td>
                         <td className="p-2 text-slate-400">{p.age || ''} {p.gender || ''}</td>
-                        <td className="p-2 text-slate-400">{p.cityOrZip || '—'}</td>
+                        <td className="p-2 text-slate-400">{p.cityState || p.cityOrZip || '—'}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -107,12 +107,12 @@ export const StrikeConsoleModal: React.FC<StrikeConsoleModalProps> = ({ isOpen, 
         {/* Big Scoreboard Bar */}
         <div className="grid grid-cols-2 gap-4 py-3">
           {/* Plaintiff / Prosecution */}
-          <div className="bg-slate-950/80 border border-blue-900/60 rounded-xl p-3 flex items-center justify-between">
+          <div className="bg-slate-950/80 border border-rose-900/60 rounded-xl p-3 flex items-center justify-between">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-blue-400">
-                Plaintiff / Prosecution Strikes
+              <div className="text-[11px] font-bold uppercase tracking-wider text-rose-400">
+                {activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'} Strikes
               </div>
-              <div className="text-xl font-mono font-extrabold text-blue-200 mt-0.5">
+              <div className="text-xl font-mono font-extrabold text-rose-200 mt-0.5">
                 {pRemaining} Remaining{' '}
                 <span className="text-xs text-slate-500 font-normal">
                   ({plaintiffStrikes.length} of {plaintiffAllowed} used)
@@ -125,7 +125,7 @@ export const StrikeConsoleModal: React.FC<StrikeConsoleModalProps> = ({ isOpen, 
                   key={idx}
                   className={`w-4 h-4 rounded-full border ${
                     idx < plaintiffStrikes.length
-                      ? 'bg-blue-600 border-blue-400 shadow-sm'
+                      ? 'bg-rose-600 border-rose-400 shadow-sm'
                       : 'border-slate-700 bg-slate-900'
                   }`}
                   title={idx < plaintiffStrikes.length ? 'Strike Used' : 'Strike Available'}
@@ -135,12 +135,12 @@ export const StrikeConsoleModal: React.FC<StrikeConsoleModalProps> = ({ isOpen, 
           </div>
 
           {/* Defense */}
-          <div className="bg-slate-950/80 border border-rose-900/60 rounded-xl p-3 flex items-center justify-between">
+          <div className="bg-slate-950/80 border border-blue-900/60 rounded-xl p-3 flex items-center justify-between">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-rose-400">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-blue-400">
                 Defense Strikes
               </div>
-              <div className="text-xl font-mono font-extrabold text-rose-200 mt-0.5">
+              <div className="text-xl font-mono font-extrabold text-blue-200 mt-0.5">
                 {dRemaining} Remaining{' '}
                 <span className="text-xs text-slate-500 font-normal">
                   ({defenseStrikes.length} of {defenseAllowed} used)
@@ -153,7 +153,7 @@ export const StrikeConsoleModal: React.FC<StrikeConsoleModalProps> = ({ isOpen, 
                   key={idx}
                   className={`w-4 h-4 rounded-full border ${
                     idx < defenseStrikes.length
-                      ? 'bg-rose-600 border-rose-400 shadow-sm'
+                      ? 'bg-blue-600 border-blue-400 shadow-sm'
                       : 'border-slate-700 bg-slate-900'
                   }`}
                   title={idx < defenseStrikes.length ? 'Strike Used' : 'Strike Available'}
@@ -251,9 +251,6 @@ export const StrikeConsoleModal: React.FC<StrikeConsoleModalProps> = ({ isOpen, 
                           </div>
                           <div className="text-[11px] text-slate-400 flex items-center space-x-2 mt-0.5">
                             <span>{cand.occupation || 'No occupation'}</span>
-                            {cand.tags?.length > 0 && (
-                              <span>• Tags: {cand.tags.join(', ')}</span>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -272,17 +269,17 @@ export const StrikeConsoleModal: React.FC<StrikeConsoleModalProps> = ({ isOpen, 
                         <div className="flex space-x-1.5">
                           <button
                             onClick={() => recordPeremptoryStrike(cand.id, 'plaintiff_prosecution')}
-                            className="px-2.5 py-1 bg-blue-900/80 hover:bg-blue-800 text-blue-200 rounded-lg text-xs font-semibold border border-blue-700"
-                            title="Strike using Plaintiff/Prosecution peremptory"
+                            className="px-2.5 py-1 bg-rose-900/80 hover:bg-rose-800 text-rose-200 rounded-lg text-xs font-semibold border border-rose-700"
+                            title={`Strike using ${activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'} peremptory`}
                           >
-                            Strike (P)
+                            Strike ({activeCase.caseType === 'criminal' ? 'Pros' : 'P'})
                           </button>
                           <button
                             onClick={() => recordPeremptoryStrike(cand.id, 'defense')}
-                            className="px-2.5 py-1 bg-rose-900/80 hover:bg-rose-800 text-rose-200 rounded-lg text-xs font-semibold border border-rose-700"
+                            className="px-2.5 py-1 bg-blue-900/80 hover:bg-blue-800 text-blue-200 rounded-lg text-xs font-semibold border border-blue-700"
                             title="Strike using Defense peremptory"
                           >
-                            Strike (D)
+                            Strike (Def)
                           </button>
                         </div>
                       </div>
@@ -306,9 +303,9 @@ export const StrikeConsoleModal: React.FC<StrikeConsoleModalProps> = ({ isOpen, 
                     <div key={s.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-900/50">
                       <div className="flex items-center space-x-3">
                         <span className={`font-bold px-2 py-0.5 rounded text-[11px] ${
-                          s.side === 'plaintiff_prosecution' ? 'bg-blue-900/70 text-blue-300' : 'bg-rose-900/70 text-rose-300'
+                          s.side === 'plaintiff_prosecution' ? 'bg-rose-900/70 text-rose-300' : 'bg-blue-900/70 text-blue-300'
                         }`}>
-                          {s.side === 'plaintiff_prosecution' ? 'Plaintiff' : 'Defense'} Round {s.round}
+                          {s.side === 'plaintiff_prosecution' ? (activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff') : 'Defense'} Round {s.round}
                         </span>
                         <div>
                           <span className="font-bold font-mono text-slate-100">
@@ -406,10 +403,10 @@ export const StrikeConsoleModal: React.FC<StrikeConsoleModalProps> = ({ isOpen, 
                   </div>
                 </div>
 
-                {/* Struck by Plaintiff */}
-                <div className="bg-slate-950 p-3 rounded-xl border border-blue-900/40">
-                  <h4 className="font-bold text-blue-300 border-b border-slate-850 pb-1.5 mb-2">
-                    Struck by Plaintiff ({struckByPlaintiff.length})
+                {/* Struck by Plaintiff / Prosecution */}
+                <div className="bg-slate-950 p-3 rounded-xl border border-rose-900/40">
+                  <h4 className="font-bold text-rose-300 border-b border-slate-850 pb-1.5 mb-2">
+                    {activeCase.caseType === 'criminal' ? 'Struck by Prosecution' : 'Struck by Plaintiff'} ({struckByPlaintiff.length})
                   </h4>
                   <div className="space-y-1 text-slate-400">
                     <strong className="text-slate-300 text-[10px] uppercase block">Gender:</strong>
@@ -430,8 +427,8 @@ export const StrikeConsoleModal: React.FC<StrikeConsoleModalProps> = ({ isOpen, 
                 </div>
 
                 {/* Struck by Defense */}
-                <div className="bg-slate-950 p-3 rounded-xl border border-rose-900/40">
-                  <h4 className="font-bold text-rose-300 border-b border-slate-850 pb-1.5 mb-2">
+                <div className="bg-slate-950 p-3 rounded-xl border border-blue-900/40">
+                  <h4 className="font-bold text-blue-300 border-b border-slate-850 pb-1.5 mb-2">
                     Struck by Defense ({struckByDefense.length})
                   </h4>
                   <div className="space-y-1 text-slate-400">

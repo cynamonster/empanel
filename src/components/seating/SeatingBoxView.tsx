@@ -196,7 +196,6 @@ export const SeatingBoxView: React.FC = () => {
       j.jurorNumber.toLowerCase().includes(term) ||
       j.fullName.toLowerCase().includes(term) ||
       (j.occupation && j.occupation.toLowerCase().includes(term)) ||
-      (j.tags && j.tags.some(t => t.toLowerCase().includes(term))) ||
       (j.strikeIntentNote && j.strikeIntentNote.toLowerCase().includes(term));
 
     if (!textMatches) return false;
@@ -333,20 +332,20 @@ export const SeatingBoxView: React.FC = () => {
                 e.stopPropagation();
                 recordPeremptoryStrike(juror.id, 'plaintiff_prosecution');
               }}
-              className="bg-blue-950 hover:bg-blue-800 border border-blue-600 text-blue-200 rounded-full p-1 shadow transition-colors"
-              title="Quick Peremptory Strike (Plaintiff / Prosecution)"
+              className="bg-rose-950 hover:bg-rose-800 border border-rose-600 text-rose-200 rounded-full p-1 shadow transition-colors"
+              title={`Quick Peremptory Strike (${activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'})`}
             >
-              <Gavel className="w-3 h-3 text-blue-300" />
+              <Gavel className="w-3 h-3 text-rose-300" />
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 recordPeremptoryStrike(juror.id, 'defense');
               }}
-              className="bg-rose-950 hover:bg-rose-800 border border-rose-600 text-rose-200 rounded-full p-1 shadow transition-colors"
+              className="bg-blue-950 hover:bg-blue-800 border border-blue-600 text-blue-200 rounded-full p-1 shadow transition-colors"
               title="Quick Peremptory Strike (Defense)"
             >
-              <Gavel className="w-3 h-3 text-rose-300" />
+              <Gavel className="w-3 h-3 text-blue-300" />
             </button>
           </div>
         </div>
