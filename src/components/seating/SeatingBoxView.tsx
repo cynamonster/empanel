@@ -524,7 +524,7 @@ export const SeatingBoxView: React.FC = () => {
             <Grid className="w-5 h-5 text-indigo-400" />
             <div>
               <h3 className="text-sm font-bold tracking-wide uppercase text-slate-200 flex items-center space-x-2">
-                <span>Venire Gallery</span>
+                <span>Jury Pool</span>
                 <span className="text-xs px-2 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
                   {jurors.length} Jurors
                 </span>
@@ -601,11 +601,7 @@ export const SeatingBoxView: React.FC = () => {
             {/* Origin Toggle (Courtroom Bottom-Left vs Top-Left) */}
             <button
               onClick={() => updateActiveCase({ galleryOrigin: origin === 'bottom-left' ? 'top-left' : 'bottom-left' })}
-              className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-                origin === 'bottom-left'
-                  ? 'bg-indigo-950/70 border-indigo-600 text-indigo-300'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
+              className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200`}
               title="Toggle between courtroom perspective (Juror #1 at bottom-left) and standard reading order"
             >
               <Compass className="w-3.5 h-3.5" />
