@@ -92,6 +92,26 @@ export const JurorCard: React.FC<JurorCardProps> = ({
           </span>
         );
       default:
+        if (juror.strikeIntent === 'strike_peremptory') {
+          return (
+            <span
+              className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-rose-950/80 text-rose-300 border border-rose-700/80"
+              title={juror.strikeIntentNote ? `Note: ${juror.strikeIntentNote}` : 'Strike Plan: Peremptory'}
+            >
+              PLAN: (P)
+            </span>
+          );
+        }
+        if (juror.strikeIntent === 'strike_cause') {
+          return (
+            <span
+              className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-950/80 text-amber-300 border border-amber-700/80"
+              title={juror.strikeIntentNote ? `Note: ${juror.strikeIntentNote}` : 'Strike Plan: For Cause'}
+            >
+              PLAN: CAUSE
+            </span>
+          );
+        }
         return null;
     }
   };
@@ -190,6 +210,16 @@ export const JurorCard: React.FC<JurorCardProps> = ({
               +{juror.tags.length - 2}
             </span>
           )}
+        </div>
+      )}
+
+      {/* Strike Intent Note to self preview */}
+      {juror.strikeIntentNote && !compact && (
+        <div
+          className="mt-1 text-[10px] text-amber-300/90 italic truncate bg-amber-950/30 px-1.5 py-0.5 rounded border border-amber-900/40"
+          title={`Note to self: ${juror.strikeIntentNote}`}
+        >
+          📝 {juror.strikeIntentNote}
         </div>
       )}
 

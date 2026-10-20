@@ -138,31 +138,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
 
-        {/* Layout Mode Toggle */}
+        {/* Unified Courtroom Workspace Indicator */}
         {activeCase && (
-          <div className="hidden lg:flex items-center bg-slate-800 p-0.5 rounded-lg border border-slate-700 text-xs">
-            <button
-              onClick={() => updateActiveCase({ layoutMode: 'box' })}
-              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-colors ${
-                activeCase.layoutMode === 'box'
-                  ? 'bg-indigo-600 text-white font-medium shadow'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>Prospective Panel ({activeCase.boxSize})</span>
-            </button>
-            <button
-              onClick={() => updateActiveCase({ layoutMode: 'grid' })}
-              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-colors ${
-                activeCase.layoutMode === 'grid'
-                  ? 'bg-indigo-600 text-white font-medium shadow'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Grid className="w-3.5 h-3.5" />
-              <span>Venire Grid</span>
-            </button>
+          <div className="hidden lg:flex items-center space-x-1.5 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700 text-xs text-slate-300 font-medium">
+            <Users className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Panel ({activeCase.boxSize})</span>
+            <span className="text-slate-600">•</span>
+            <Grid className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Venire Gallery</span>
           </div>
         )}
       </div>

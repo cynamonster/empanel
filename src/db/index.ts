@@ -22,23 +22,24 @@ export class VoirDireDatabase extends Dexie {
 
 export const db = new VoirDireDatabase();
 
-export async function createDefaultCase(type: 'civil' | 'criminal' = 'civil'): Promise<Case> {
-  const isCivil = type === 'civil';
+export async function createDefaultCase(type: 'civil' | 'criminal' = 'criminal'): Promise<Case> {
+  const isCriminal = type === 'criminal';
   const newCase: Case = {
     id: `case-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    name: isCivil ? 'New Civil Trial (3 Strikes)' : 'New Criminal Trial (6 Strikes)',
+    name: isCriminal ? 'New Criminal Trial (3 Strikes)' : 'New Civil Trial (3 Strikes)',
     caseType: type,
-    ourSide: isCivil ? 'plaintiff_prosecution' : 'defense',
-    plaintiffStrikesAllowed: isCivil ? 3 : 6,
-    defenseStrikesAllowed: isCivil ? 3 : 6,
+    ourSide: 'defense',
+    plaintiffStrikesAllowed: 3,
+    defenseStrikesAllowed: 3,
     alternateStrikesAllowed: 1,
     layoutMode: 'box',
-    boxSize: 12,
-    alternateCount: 2,
+    boxSize: isCriminal ? 6 : 12,
+    alternateCount: isCriminal ? 1 : 2,
     gridRows: 4,
     gridCols: 8,
     galleryGutters: '1',
     galleryOrigin: 'bottom-left',
+    autoFillPanel: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

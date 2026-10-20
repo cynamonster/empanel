@@ -30,6 +30,10 @@ export interface Juror {
   notes: string;
   tags: string[]; // e.g. "Tort Reform", "Prior Accident", "Engineer"
   
+  // Tactical notes to self on strike intent
+  strikeIntent?: 'none' | 'strike_peremptory' | 'strike_cause';
+  strikeIntentNote?: string;
+  
   // Seating assignment
   seatNumber?: number; // 1-12/14 for box, or grid index
   isAlternate?: boolean;

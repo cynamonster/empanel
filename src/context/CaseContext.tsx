@@ -114,7 +114,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       currentCase = allCases[0];
       setActiveCase(currentCase);
     } else if (allCases.length === 0) {
-      const def = await createDefaultCase('civil');
+      const def = await createDefaultCase('criminal');
       setCases([def]);
       currentCase = def;
       setActiveCase(def);
@@ -190,7 +190,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (remaining.length > 0) {
       await switchCase(remaining[0].id);
     } else {
-      const def = await createDefaultCase('civil');
+      const def = await createDefaultCase('criminal');
       setCases([def]);
       await switchCase(def.id);
     }

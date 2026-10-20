@@ -15,7 +15,8 @@ import {
   User,
   MapPin,
   Briefcase,
-  GraduationCap
+  GraduationCap,
+  FileEdit
 } from 'lucide-react';
 
 export const JurorDetailDrawer: React.FC = () => {
@@ -122,55 +123,116 @@ export const JurorDetailDrawer: React.FC = () => {
           </div>
         </div>
 
-        {/* SECTION: STRIKE / CAUSE ACTIONS */}
+        {/* SECTION: STRIKE ASSESSMENT (NOTES TO SELF) */}
         <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-2.5">
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-            <span>Courtroom Strike Actions</span>
-            {juror.statusNotes && (
-              <span className="text-[10px] text-amber-400 font-normal">
-                {juror.statusNotes}
+          <div className="flex items-center justify-between">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center space-x-1.5">
+              <FileEdit className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Strike Plan (Notes to Self)</span>
+            </label>
+            {juror.strikeIntent && juror.strikeIntent !== 'none' && (
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                juror.strikeIntent === 'strike_peremptory'
+                  ? 'bg-rose-950/70 border-rose-700/80 text-rose-300'
+                  : 'bg-amber-950/70 border-amber-700/80 text-amber-300'
+              }`}>
+                {juror.strikeIntent === 'strike_peremptory' ? 'Plan: Peremptory' : 'Plan: For Cause'}
               </span>
             )}
-          </label>
+          </div>
 
+          <p className="text-[11px] text-slate-400 leading-tight">
+            Record your private tactical assessment of whether to strike this juror:
+          </p>
+
+          {/* 3 Intent Options */}
+          <div className="grid grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              onClick={() => updateJuror(juror.id, { strikeIntent: 'none' })}
+              className={`px-2 py-1.5 rounded-lg text-xs font-semibold border transition-all text-center ${
+                !juror.strikeIntent || juror.strikeIntent === 'none'
+                  ? 'bg-slate-800 border-slate-600 text-slate-200 shadow'
+                  : 'bg-slate-900/60 border-slate-800 text-slate-500 hover:text-slate-300 hover:bg-slate-850'
+              }`}
+            >
+              Undecided
+            </button>
+            <button
+              type="button"
+              onClick={() => updateJuror(juror.id, { strikeIntent: 'strike_peremptory' })}
+              className={`px-2 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center space-x-1 ${
+                juror.strikeIntent === 'strike_peremptory'
+                  ? 'bg-rose-950 border-rose-500 text-rose-200 ring-2 ring-rose-500/30 shadow'
+                  : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-rose-300 hover:bg-rose-950/30'
+              }`}
+            >
+              <Gavel className="w-3 h-3 text-rose-400" />
+              <span>Peremptory</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => updateJuror(juror.id, { strikeIntent: 'strike_cause' })}
+              className={`px-2 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center space-x-1 ${
+                juror.strikeIntent === 'strike_cause'
+                  ? 'bg-amber-950 border-amber-500 text-amber-200 ring-2 ring-amber-500/30 shadow'
+                  : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-amber-300 hover:bg-amber-950/30'
+              }`}
+            >
+              <ShieldAlert className="w-3 h-3 text-amber-400" />
+              <span>For Cause</span>
+            </button>
+          </div>
+
+          {/* Optional Note */}
+          <div className="space-y-1 pt-1">
+            <span className="text-[10px] text-slate-400 uppercase font-semibold">
+              Optional Note on Reason / Bias:
+            </span>
+            <textarea
+              rows={2}
+              value={juror.strikeIntentNote || ''}
+              onChange={e => updateJuror(juror.id, { strikeIntentNote: e.target.value })}
+              placeholder="e.g. Hostile demeanor, sister arrested in similar case, admitted hesitation on beyond reasonable doubt..."
+              className="w-full bg-slate-900 border border-slate-700/80 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-600 outline-none focus:border-indigo-500 resize-none"
+            />
+          </div>
+
+          {/* If juror is struck in court or currently seated in panel, show courtroom status */}
           {isStruck ? (
-            <div className="flex items-center justify-between bg-slate-900 p-2.5 rounded-lg border border-slate-700">
-              <span className="text-xs text-slate-300 font-medium">
-                Juror is currently struck/excused
+            <div className="flex items-center justify-between bg-slate-900/90 p-2 rounded-lg border border-slate-700/70 mt-2">
+              <span className="text-[11px] text-slate-300 font-medium">
+                Official Status: <span className="text-amber-300 font-semibold">{juror.statusNotes || 'Struck'}</span>
               </span>
               <button
                 onClick={() => revertStrike(juror.id)}
-                className="flex items-center space-x-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded-md text-xs font-semibold transition-colors"
+                className="flex items-center space-x-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded text-[11px] font-semibold transition-colors"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-3 h-3" />
                 <span>Revert Strike</span>
               </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => recordPeremptoryStrike(juror.id, 'plaintiff_prosecution')}
-                className="flex items-center justify-center space-x-1.5 p-2 bg-blue-950/50 hover:bg-blue-900/70 border border-blue-800 text-blue-300 rounded-lg font-medium transition-colors"
-              >
-                <Gavel className="w-3.5 h-3.5" />
-                <span>Strike (Plaintiff)</span>
-              </button>
-              <button
-                onClick={() => recordPeremptoryStrike(juror.id, 'defense')}
-                className="flex items-center justify-center space-x-1.5 p-2 bg-rose-950/50 hover:bg-rose-900/70 border border-rose-800 text-rose-300 rounded-lg font-medium transition-colors"
-              >
-                <Gavel className="w-3.5 h-3.5" />
-                <span>Strike (Defense)</span>
-              </button>
-              <button
-                onClick={() => setShowCauseModal(true)}
-                className="col-span-2 flex items-center justify-center space-x-1.5 p-2 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-800/80 text-amber-300 rounded-lg font-medium transition-colors"
-              >
-                <ShieldAlert className="w-3.5 h-3.5" />
-                <span>Challenge for Cause</span>
-              </button>
+          ) : juror.seatNumber !== undefined ? (
+            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+              <span className="text-[10px] text-slate-400">Currently Seated in Panel:</span>
+              <div className="flex items-center space-x-1.5">
+                <button
+                  onClick={() => recordPeremptoryStrike(juror.id, 'defense')}
+                  className="px-2 py-1 bg-rose-950/70 hover:bg-rose-900 border border-rose-700 text-rose-300 rounded text-[10px] font-semibold"
+                  title="Execute official defense peremptory strike in court"
+                >
+                  Strike (Defense)
+                </button>
+                <button
+                  onClick={() => setShowCauseModal(true)}
+                  className="px-2 py-1 bg-amber-950/70 hover:bg-amber-900 border border-amber-700 text-amber-300 rounded text-[10px] font-semibold"
+                  title="Raise official cause challenge in court"
+                >
+                  Cause Challenge
+                </button>
+              </div>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* SECTION: SEATING POSITION */}

@@ -9,7 +9,7 @@ interface NewCaseModalProps {
 
 export const NewCaseModal: React.FC<NewCaseModalProps> = ({ isOpen, onClose }) => {
   const { createNewCase } = useCase();
-  const [caseType, setCaseType] = useState<'civil' | 'criminal'>('civil');
+  const [caseType, setCaseType] = useState<'civil' | 'criminal'>('criminal');
   const [name, setName] = useState('');
 
   if (!isOpen) return null;

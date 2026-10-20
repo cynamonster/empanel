@@ -35,11 +35,7 @@ const CourtroomWorkspace: React.FC = () => {
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left/Center Workspace: Seating Layout */}
         <main className="flex-1 flex flex-col overflow-hidden relative">
-          {activeCase?.layoutMode === 'box' ? (
-            <SeatingBoxView />
-          ) : (
-            <SeatingGridView />
-          )}
+          <SeatingBoxView />
         </main>
 
         {/* Right Collapsible Context Drawer: Juror Profiling & Courtroom Action */}

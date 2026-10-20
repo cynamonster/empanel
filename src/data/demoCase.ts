@@ -166,6 +166,20 @@ export function getDemoCaseData(): {
       isAlternate = seatedMapping[item.num].isAlternate;
     }
 
+    let strikeIntent: Juror['strikeIntent'] = 'none';
+    let strikeIntentNote: string | undefined = undefined;
+
+    if (item.num === '18') {
+      strikeIntent = 'strike_peremptory';
+      strikeIntentNote = 'Fraud investigator; predisposed to believe prosecution claims';
+    } else if (item.num === '19') {
+      strikeIntent = 'strike_cause';
+      strikeIntentNote = 'Confirmed unconditional trust in police officers; actual bias';
+    } else if (item.num === '28') {
+      strikeIntent = 'strike_peremptory';
+      strikeIntentNote = 'Skeptical of defendant exercising 5th Amendment right to remain silent';
+    }
+
     return {
       id: `juror-${caseId}-${item.num}`,
       caseId,
@@ -180,6 +194,8 @@ export function getDemoCaseData(): {
       rating: item.rating,
       status,
       statusNotes,
+      strikeIntent,
+      strikeIntentNote,
       notes: item.notes,
       tags: item.tags,
       seatNumber,

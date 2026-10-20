@@ -6,15 +6,21 @@ import {
   Search,
   PlusCircle,
   XCircle,
-  UserCheck,
-  ChevronRight,
   ShieldCheck,
   Zap,
   Sparkles,
-  RotateCcw,
-  Gavel
+  Gavel,
+  Compass,
+  Grid
 } from 'lucide-react';
 import type { Juror } from '../../types';
+
+function getColumnSplits(totalCols: number, gutters: 'none' | '1'): number[] {
+  if (gutters === 'none' || totalCols < 2) return [totalCols];
+  const left = Math.ceil(totalCols / 2);
+  const right = totalCols - left;
+  return [left, right];
+}
 
 export const SeatingBoxView: React.FC = () => {
   const {
@@ -25,14 +31,16 @@ export const SeatingBoxView: React.FC = () => {
     recordPeremptoryStrike,
     prefillSequentialPanel,
     toggleAutoFillPanel,
+    updateActiveCase,
+    reorderGalleryJurors,
   } = useCase();
 
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'active' | 'unseated' | 'struck'>('all');
-  const [sortBy, setSortBy] = useState<'number' | 'rating-desc' | 'rating-asc'>('number');
+  const [filter, setFilter] = useState<'all' | 'active' | 'positive' | 'negative' | 'struck'>('all');
   const [targetSeatModal, setTargetSeatModal] = useState<{ seatNumber: number; isAlternate: boolean } | null>(null);
   const [draggedJurorId, setDraggedJurorId] = useState<string | null>(null);
   const [dragOverSeat, setDragOverSeat] = useState<string | null>(null);
+  const [dragOverGalleryId, setDragOverGalleryId] = useState<string | null>(null);
   const [swappedJurorIds, setSwappedJurorIds] = useState<string[]>([]);
   const [slidingJurorIds, setSlidingJurorIds] = useState<string[]>([]);
 
@@ -135,14 +143,34 @@ export const SeatingBoxView: React.FC = () => {
 
   if (!activeCase) return null;
 
-  const boxSize = activeCase.boxSize || 12;
-  const alternateCount = activeCase.alternateCount || 2;
+  const boxSize = activeCase.boxSize || 6;
+  const alternateCount = activeCase.alternateCount || 1;
   const autoFillEnabled = !!activeCase.autoFillPanel;
+  const gridCols = activeCase.gridCols || 8;
+  const gutters = (activeCase.galleryGutters === 'none' ? 'none' : '1') as 'none' | '1';
+  const origin = activeCase.galleryOrigin || 'bottom-left';
 
-  // Split box into 2 rows for realistic courtroom layout (e.g. 6 & 6)
-  const halfBox = Math.ceil(boxSize / 2);
-  const row1Seats = Array.from({ length: halfBox }, (_, i) => i + 1);
-  const row2Seats = Array.from({ length: boxSize - halfBox }, (_, i) => halfBox + i + 1);
+  // Section 1 Row Calculation:
+  // Regardless of how many jurors a panel has, fill every slot in div.mb-2 (up to 6)
+  // before moving onto div.mb-4 and so on!
+  const MAX_PANEL_ROW_SEATS = 6;
+  const row1Seats = Array.from(
+    { length: Math.min(boxSize, MAX_PANEL_ROW_SEATS) },
+    (_, i) => i + 1
+  );
+  const row2Seats = boxSize > MAX_PANEL_ROW_SEATS
+    ? Array.from(
+        { length: Math.min(boxSize - MAX_PANEL_ROW_SEATS, MAX_PANEL_ROW_SEATS) },
+        (_, i) => MAX_PANEL_ROW_SEATS + i + 1
+      )
+    : [];
+  const row3Seats = boxSize > MAX_PANEL_ROW_SEATS * 2
+    ? Array.from(
+        { length: boxSize - MAX_PANEL_ROW_SEATS * 2 },
+        (_, i) => MAX_PANEL_ROW_SEATS * 2 + i + 1
+      )
+    : [];
+
   const alternateSeats = Array.from({ length: alternateCount }, (_, i) => i + 1);
 
   // Map seated jurors
@@ -166,33 +194,20 @@ export const SeatingBoxView: React.FC = () => {
       j.jurorNumber.toLowerCase().includes(term) ||
       j.fullName.toLowerCase().includes(term) ||
       (j.occupation && j.occupation.toLowerCase().includes(term)) ||
-      (j.tags && j.tags.some(t => t.toLowerCase().includes(term)));
+      (j.tags && j.tags.some(t => t.toLowerCase().includes(term))) ||
+      (j.strikeIntentNote && j.strikeIntentNote.toLowerCase().includes(term));
 
     if (!textMatches) return false;
 
-    if (filter === 'unseated') {
-      return j.seatNumber === undefined && !j.status.startsWith('struck_') && j.status !== 'cause_granted';
-    }
-    if (filter === 'active') {
-      return !j.status.startsWith('struck_') && j.status !== 'cause_granted';
-    }
-    if (filter === 'struck') {
-      return j.status.startsWith('struck_') || j.status === 'cause_granted';
-    }
+    if (filter === 'active') return !j.status.startsWith('struck_') && j.status !== 'cause_granted';
+    if (filter === 'positive') return j.rating > 0;
+    if (filter === 'negative') return j.rating < 0;
+    if (filter === 'struck') return j.status.startsWith('struck_') || j.status === 'cause_granted';
+
     return true;
   };
 
-  // Sort all jurors for the pool
-  const poolJurors = [...jurors].sort((a, b) => {
-    if (sortBy === 'rating-desc') return b.rating - a.rating;
-    if (sortBy === 'rating-asc') return a.rating - b.rating;
-    const numA = parseInt(a.jurorNumber, 10);
-    const numB = parseInt(b.jurorNumber, 10);
-    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-    return a.jurorNumber.localeCompare(b.jurorNumber);
-  });
-
-  // Drag and Drop helpers with apparent animation
+  // Drag and Drop handlers
   const handleDragStart = (e: React.DragEvent, jurorId: string) => {
     setDraggedJurorId(jurorId);
     e.dataTransfer.setData('text/plain', jurorId);
@@ -211,35 +226,52 @@ export const SeatingBoxView: React.FC = () => {
     }
   };
 
-  const handlePoolCardDrop = (e: React.DragEvent, targetJuror: Juror) => {
+  const handleGalleryDrop = (e: React.DragEvent, targetJuror: Juror) => {
     e.preventDefault();
     const sourceId = e.dataTransfer.getData('text/plain') || draggedJurorId;
     if (sourceId && sourceId !== targetJuror.id) {
-      const sourceJuror = jurors.find(j => j.id === sourceId);
-      if (sourceJuror) {
-        if (sourceJuror.seatNumber !== undefined || targetJuror.seatNumber !== undefined) {
-          const sSeat = sourceJuror.seatNumber;
-          const sAlt = sourceJuror.isAlternate;
-          const tSeat = targetJuror.seatNumber;
-          const tAlt = targetJuror.isAlternate;
-          if (sSeat !== undefined && tSeat !== undefined) {
-            assignSeat(sourceId, tSeat, tAlt);
-            assignSeat(targetJuror.id, sSeat, sAlt);
-          } else if (sSeat !== undefined) {
-            unseatJuror(sourceId);
-            assignSeat(targetJuror.id, sSeat, sAlt);
-          } else if (tSeat !== undefined) {
-            unseatJuror(targetJuror.id);
-            assignSeat(sourceId, tSeat, tAlt);
-          }
-        }
-        setSwappedJurorIds([sourceId, targetJuror.id]);
-        setTimeout(() => setSwappedJurorIds([]), 800);
-      }
+      reorderGalleryJurors(sourceId, targetJuror.id);
+      setSwappedJurorIds([sourceId, targetJuror.id]);
+      setTimeout(() => setSwappedJurorIds([]), 800);
     }
     setDraggedJurorId(null);
+    setDragOverGalleryId(null);
   };
 
+  // Section 2 Gallery Calculations:
+  const splits: number[] = getColumnSplits(gridCols, gutters);
+
+  const sortedJurors = [...jurors].sort((a, b) => {
+    if (activeCase.galleryOrder && activeCase.galleryOrder.length > 0) {
+      const idxA = activeCase.galleryOrder.indexOf(a.id);
+      const idxB = activeCase.galleryOrder.indexOf(b.id);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+    }
+    const numA = parseInt(a.jurorNumber, 10);
+    const numB = parseInt(b.jurorNumber, 10);
+    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+    return a.jurorNumber.localeCompare(b.jurorNumber);
+  });
+
+  const numRows = Math.max(1, Math.ceil(sortedJurors.length / gridCols));
+  const rowsData: { rowNumber: number; jurors: (Juror | null)[] }[] = [];
+  for (let r = 0; r < numRows; r++) {
+    const startIdx = r * gridCols;
+    const rowJurors: (Juror | null)[] = [];
+    for (let c = 0; c < gridCols; c++) {
+      const jIdx = startIdx + c;
+      rowJurors.push(jIdx < sortedJurors.length ? sortedJurors[jIdx] : null);
+    }
+    rowsData.push({ rowNumber: r + 1, jurors: rowJurors });
+  }
+
+  const displayedRows = origin === 'bottom-left'
+    ? [...rowsData].reverse()
+    : rowsData;
+
+  // Render a single seat slot in the Prospective Panel
   const renderSeatSlot = (seatNum: number, isAlt = false) => {
     const juror = isAlt ? alternateMap.get(seatNum) : seatedMap.get(seatNum);
     const label = isAlt ? `Alt ${seatNum}` : `Seat ${seatNum}`;
@@ -379,7 +411,7 @@ export const SeatingBoxView: React.FC = () => {
                   ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 ring-2 ring-amber-500/30'
                   : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
               }`}
-              title="When enabled, if any seated panel juror is struck, the next sequential unstruck juror is automatically pulled in!"
+              title="When enabled, if any seated panel juror is struck, remaining jurors slide and replacements are automatically pulled in!"
             >
               <Zap className={`w-3.5 h-3.5 ${autoFillEnabled ? 'text-amber-400 fill-amber-400' : 'text-slate-500'}`} />
               <span>Auto-Pull Replacements: {autoFillEnabled ? 'ON' : 'OFF'}</span>
@@ -397,25 +429,46 @@ export const SeatingBoxView: React.FC = () => {
           </div>
         </div>
 
-        {/* Back Row */}
+        {/* Row 1 / Primary Bench (Seats 1-6) */}
+        {/* Fills every div.relative group.rounded-xl.transition-all in div.mb-2 before moving onto div.mb-4 */}
         <div className="mb-2">
-          <div className="text-[11px] font-semibold uppercase text-slate-500 tracking-wider mb-1.5 px-1">
-            Back Row
+          <div className="text-[11px] font-semibold uppercase text-slate-500 tracking-wider mb-1.5 px-1 flex items-center justify-between">
+            <span>{boxSize > MAX_PANEL_ROW_SEATS ? 'Row 1 (Seats 1–6)' : 'Prospective Jury Box (Seats 1–6)'}</span>
+            <span className="text-[10px] text-slate-600 font-mono">
+              {row1Seats.filter(s => seatedMap.has(s)).length} / {row1Seats.length} Seated
+            </span>
           </div>
-          <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5`}>
-            {row2Seats.map(num => renderSeatSlot(num, false))}
-          </div>
-        </div>
-
-        {/* Front Row */}
-        <div className="mb-4">
-          <div className="text-[11px] font-semibold uppercase text-slate-500 tracking-wider mb-1.5 px-1">
-            Front Row
-          </div>
-          <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5`}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
             {row1Seats.map(num => renderSeatSlot(num, false))}
           </div>
         </div>
+
+        {/* Row 2 (Seats 7-12, only if boxSize > 6) */}
+        {row2Seats.length > 0 && (
+          <div className="mb-4">
+            <div className="text-[11px] font-semibold uppercase text-slate-500 tracking-wider mb-1.5 px-1 flex items-center justify-between">
+              <span>Row 2 (Seats 7–{MAX_PANEL_ROW_SEATS + row2Seats.length})</span>
+              <span className="text-[10px] text-slate-600 font-mono">
+                {row2Seats.filter(s => seatedMap.has(s)).length} / {row2Seats.length} Seated
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+              {row2Seats.map(num => renderSeatSlot(num, false))}
+            </div>
+          </div>
+        )}
+
+        {/* Row 3 (if boxSize > 12) */}
+        {row3Seats.length > 0 && (
+          <div className="mb-4">
+            <div className="text-[11px] font-semibold uppercase text-slate-500 tracking-wider mb-1.5 px-1">
+              <span>Row 3</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+              {row3Seats.map(num => renderSeatSlot(num, false))}
+            </div>
+          </div>
+        )}
 
         {/* Alternates Bench */}
         {alternateCount > 0 && (
@@ -431,200 +484,227 @@ export const SeatingBoxView: React.FC = () => {
         )}
       </div>
 
-      {/* SECTION 2: JURY POOL */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 shadow-xl flex-1 flex flex-col">
-        {/* Pool Controls */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 mb-4">
+      {/* SECTION 2: VENIRE GALLERY GRID (Replaces plain pool) */}
+      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 shadow-xl flex-1 flex flex-col space-y-4">
+        {/* Gallery Controls Header */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
           <div className="flex items-center space-x-2">
-            <h3 className="text-sm font-bold tracking-wide uppercase text-slate-300 flex items-center space-x-2">
-              <span>Jury Pool</span>
-              <span className="text-xs px-2 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">
-                {poolJurors.length} Total
-              </span>
-            </h3>
+            <Grid className="w-5 h-5 text-indigo-400" />
+            <div>
+              <h3 className="text-sm font-bold tracking-wide uppercase text-slate-200 flex items-center space-x-2">
+                <span>Venire Gallery</span>
+                <span className="text-xs px-2 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
+                  {jurors.length} Jurors
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Courtroom seating gallery • Drag to swap gallery seats or drag up to panel
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Search */}
-            <div className="relative flex-1 sm:w-56">
+            <div className="relative flex-1 sm:w-48">
               <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
               <input
                 type="text"
-                placeholder="Search (dims non-matches)..."
+                placeholder="Search gallery..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 outline-none"
               />
             </div>
 
-            {/* Filter */}
+            {/* Filter Pills */}
             <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs">
+              {(['all', 'active', 'positive', 'negative', 'struck'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`px-2 py-1 rounded capitalize transition-colors ${
+                    filter === f
+                      ? f === 'positive'
+                        ? 'bg-emerald-950/80 text-emerald-300 font-medium'
+                        : f === 'negative' || f === 'struck'
+                        ? 'bg-rose-950/80 text-rose-300 font-medium'
+                        : 'bg-indigo-600 text-white font-medium'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {f === 'positive' ? 'Favorable' : f === 'negative' ? 'Unfavorable' : f}
+                </button>
+              ))}
+            </div>
+
+            {/* Vertical Aisle Walkway Toggle */}
+            <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs">
+              <span className="text-[10px] text-slate-400 font-semibold px-2 uppercase tracking-wider hidden sm:inline">
+                Aisle:
+              </span>
               <button
-                onClick={() => setFilter('all')}
-                className={`px-2 py-1 rounded transition-colors ${filter === 'all' ? 'bg-slate-800 text-slate-200 font-medium' : 'text-slate-400 hover:text-slate-300'}`}
+                onClick={() => updateActiveCase({ galleryGutters: 'none' })}
+                className={`px-2.5 py-1 rounded font-medium transition-colors ${
+                  gutters === 'none'
+                    ? 'bg-indigo-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Continuous gallery bench"
               >
-                All
+                None
               </button>
               <button
-                onClick={() => setFilter('unseated')}
-                className={`px-2 py-1 rounded transition-colors ${filter === 'unseated' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400 hover:text-slate-300'}`}
+                onClick={() => updateActiveCase({ galleryGutters: '1' })}
+                className={`px-2.5 py-1 rounded font-medium transition-colors ${
+                  gutters === '1'
+                    ? 'bg-indigo-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="1 Central Walkway Aisle"
               >
-                Unseated
-              </button>
-              <button
-                onClick={() => setFilter('active')}
-                className={`px-2 py-1 rounded transition-colors ${filter === 'active' ? 'bg-slate-800 text-slate-200 font-medium' : 'text-slate-400 hover:text-slate-300'}`}
-              >
-                Active
-              </button>
-              <button
-                onClick={() => setFilter('struck')}
-                className={`px-2 py-1 rounded transition-colors ${filter === 'struck' ? 'bg-rose-950/60 text-rose-300 font-medium' : 'text-slate-400 hover:text-slate-300'}`}
-              >
-                Struck
+                1 Central
               </button>
             </div>
 
-            {/* Sort */}
-            <select
-              value={sortBy}
-              onChange={e => setSortBy(e.target.value as any)}
-              className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-300 outline-none"
+            {/* Origin Toggle (Courtroom Bottom-Left vs Top-Left) */}
+            <button
+              onClick={() => updateActiveCase({ galleryOrigin: origin === 'bottom-left' ? 'top-left' : 'bottom-left' })}
+              className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                origin === 'bottom-left'
+                  ? 'bg-indigo-950/70 border-indigo-600 text-indigo-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+              }`}
+              title="Toggle between courtroom perspective (Juror #1 at bottom-left) and standard reading order"
             >
-              <option value="number">Sort: Juror #</option>
-              <option value="rating-desc">Sort: Rating (High → Low)</option>
-              <option value="rating-asc">Sort: Rating (Low → High)</option>
-            </select>
+              <Compass className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">
+                {origin === 'bottom-left' ? 'Bottom-Left #1' : 'Top-Left #1'}
+              </span>
+            </button>
+
+            {/* Column Selector */}
+            <div className="flex items-center space-x-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 text-xs text-slate-400">
+              <span>Cols:</span>
+              <select
+                value={gridCols}
+                onChange={e => updateActiveCase({ gridCols: parseInt(e.target.value, 10) })}
+                className="bg-transparent text-slate-200 font-semibold outline-none cursor-pointer"
+              >
+                <option value="6" className="bg-slate-900">6</option>
+                <option value="8" className="bg-slate-900">8</option>
+                <option value="10" className="bg-slate-900">10</option>
+                <option value="12" className="bg-slate-900">12</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* Pool Grid: Seats stay fixed, filtered cards greyed out */}
-        {poolJurors.length === 0 ? (
+        {/* Gallery Benches Canvas */}
+        {sortedJurors.length === 0 ? (
           <div className="py-12 text-center text-slate-500 text-xs">
-            No jurors found in jury pool.
+            No jurors in gallery. Use the "Intake" button at the top to import a juror roster.
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 overflow-y-auto max-h-[600px] p-1">
-            {poolJurors.map(juror => {
-              const isDimmed = !matchesFilter(juror);
-              const isUnseated = juror.seatNumber === undefined && !juror.status.startsWith('struck_') && juror.status !== 'cause_granted';
+          <div className="space-y-4">
+            {/* Top Label for Back of Courtroom (if bottom-left origin) */}
+            {origin === 'bottom-left' && (
+              <div className="text-center py-1 bg-slate-950/60 border border-dashed border-slate-800 rounded-lg text-[11px] font-semibold text-slate-500 uppercase tracking-widest">
+                🚪 BACK OF COURTROOM / GALLERY ENTRANCE
+              </div>
+            )}
 
-              return (
-                <div
-                  key={juror.id}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => handlePoolCardDrop(e, juror)}
-                  className="relative group transition-all duration-300"
-                >
-                  <JurorCard
-                    juror={juror}
-                    isDimmed={isDimmed}
-                    highlightEffect={swappedJurorIds.includes(juror.id)}
-                    isDraggable={true}
-                    onDragStart={(e) => handleDragStart(e, juror.id)}
-                  />
-                  
-                  {/* Quick Seat Button */}
-                  {isUnseated && !isDimmed && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Find first open seat in Prospective Panel
-                        for (let i = 1; i <= boxSize; i++) {
-                          if (!seatedMap.has(i)) {
-                            assignSeat(juror.id, i, false);
-                            return;
-                          }
-                        }
-                        // If box full, try alternate
-                        for (let i = 1; i <= alternateCount; i++) {
-                          if (!alternateMap.has(i)) {
-                            assignSeat(juror.id, i, true);
-                            return;
-                          }
-                        }
-                      }}
-                      className="absolute bottom-2 right-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-1.5 py-0.5 text-[10px] font-medium shadow opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1"
-                      title="Seat in next available seat"
-                    >
-                      <UserCheck className="w-3 h-3" />
-                      <span>Seat</span>
-                    </button>
-                  )}
+            {/* Gallery Rows with optional central walkway aisle */}
+            <div className="space-y-3">
+              {displayedRows.map((row) => (
+                <div key={row.rowNumber} className="flex items-center gap-2">
+                  <div className="w-12 text-right text-[11px] font-mono text-slate-500 select-none">
+                    Row {row.rowNumber}
+                  </div>
+
+                  <div className="flex-1 flex items-stretch gap-3">
+                    {/* Render split banks (left and right sections if central aisle) */}
+                    {(() => {
+                      let colOffset = 0;
+                      return splits.map((bankWidth, bankIdx) => {
+                        const bankJurors = row.jurors.slice(colOffset, colOffset + bankWidth);
+                        const isLastBank = bankIdx === splits.length - 1;
+                        colOffset += bankWidth;
+
+                        return (
+                          <React.Fragment key={bankIdx}>
+                            {/* Bank Grid */}
+                            <div
+                              className="flex-1 grid gap-2.5"
+                              style={{
+                                gridTemplateColumns: `repeat(${bankWidth}, minmax(0, 1fr))`
+                              }}
+                            >
+                              {bankJurors.map((juror, cIdx) => {
+                                if (!juror) {
+                                  return (
+                                    <div
+                                      key={`empty-${cIdx}`}
+                                      className="h-[105px] border border-dashed border-slate-850 rounded-xl bg-slate-950/20"
+                                    />
+                                  );
+                                }
+
+                                const isDimmed = !matchesFilter(juror);
+                                const isOver = dragOverGalleryId === juror.id;
+                                const isSwapped = swappedJurorIds.includes(juror.id);
+
+                                return (
+                                  <div
+                                    key={juror.id}
+                                    onDragOver={(e) => {
+                                      e.preventDefault();
+                                      setDragOverGalleryId(juror.id);
+                                    }}
+                                    onDragLeave={() => setDragOverGalleryId(null)}
+                                    onDrop={(e) => handleGalleryDrop(e, juror)}
+                                    className={`relative rounded-xl transition-all duration-200 ${
+                                      isOver ? 'ring-2 ring-indigo-400 scale-[1.03] z-10' : ''
+                                    }`}
+                                  >
+                                    <JurorCard
+                                      juror={juror}
+                                      isDimmed={isDimmed}
+                                      highlightEffect={isSwapped}
+                                      isDraggable={true}
+                                      onDragStart={(e) => handleDragStart(e, juror.id)}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Clean Walkway Aisle between banks */}
+                            {!isLastBank && (
+                              <div className="w-9 self-stretch flex flex-col items-center justify-center relative select-none">
+                                <div className="w-1.5 h-full rounded-full bg-slate-800/80 border border-slate-700/50" />
+                                <span className="absolute top-1/2 -translate-y-1/2 -rotate-90 text-[8px] font-mono tracking-widest text-slate-500 uppercase whitespace-nowrap pointer-events-none">
+                                  AISLE
+                                </span>
+                              </div>
+                            )}
+                          </React.Fragment>
+                        );
+                      });
+                    })()}
+                  </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+
+            {/* Well of Court / Judge's Bench Banner (if bottom-left origin) */}
+            {origin === 'bottom-left' && (
+              <div className="text-center py-2 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-900/40 rounded-xl text-xs font-bold text-indigo-300 uppercase tracking-widest shadow-inner">
+                ⚖️ WELL OF COURT / COUNSEL TABLES & JUDGE’S BENCH
+              </div>
+            )}
           </div>
         )}
       </div>
-
-      {/* Target Seat Picker Modal */}
-      {targetSeatModal && (
-        <div
-          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setTargetSeatModal(null)}
-        >
-          <div
-            className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-5 shadow-2xl flex flex-col max-h-[80vh]"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-base font-bold text-slate-100">
-                Seat Juror in {targetSeatModal.isAlternate ? `Alternate ${targetSeatModal.seatNumber}` : `Seat ${targetSeatModal.seatNumber}`}
-              </h3>
-              <button
-                onClick={() => setTargetSeatModal(null)}
-                className="text-slate-400 hover:text-slate-200"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="py-3">
-              <input
-                type="text"
-                placeholder="Filter prospective jurors..."
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 outline-none"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-2 py-1">
-              {poolJurors
-                .filter(j => !j.status.startsWith('struck_') && j.status !== 'cause_granted')
-                .map(j => (
-                  <div
-                    key={j.id}
-                    onClick={() => {
-                      assignSeat(j.id, targetSeatModal.seatNumber, targetSeatModal.isAlternate);
-                      setTargetSeatModal(null);
-                    }}
-                    className="p-2.5 rounded-xl bg-slate-950 hover:bg-indigo-950/50 border border-slate-800 hover:border-indigo-500 cursor-pointer flex items-center justify-between transition-colors"
-                  >
-                    <div>
-                      <div className="font-semibold text-slate-200 text-xs">
-                        #{j.jurorNumber} — {j.fullName}
-                      </div>
-                      <div className="text-[11px] text-slate-400">
-                        {j.occupation || 'No occupation'} {j.age ? `• ${j.age}y` : ''}
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                        j.rating > 0 ? 'bg-emerald-500/20 text-emerald-300' :
-                        j.rating < 0 ? 'bg-rose-500/20 text-rose-300' : 'bg-slate-800 text-slate-400'
-                      }`}>
-                        {j.rating > 0 ? `+${j.rating}` : j.rating}
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-slate-500" />
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
