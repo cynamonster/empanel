@@ -14,7 +14,10 @@ import {
   Gavel,
   Compass,
   Grid,
-  Trash2
+  Trash2,
+  Plus,
+  Minus,
+  X
 } from 'lucide-react';
 import type { Juror } from '../../types';
 
@@ -43,6 +46,7 @@ export const SeatingBoxView: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'positive' | 'negative' | 'struck'>('all');
   const [targetSeatModal, setTargetSeatModal] = useState<{ seatNumber: number; isAlternate: boolean } | null>(null);
+  const [targetSeatSearch, setTargetSeatSearch] = useState('');
   const [draggedJurorId, setDraggedJurorId] = useState<string | null>(null);
   const [dragOverSeat, setDragOverSeat] = useState<string | null>(null);
   const [dragOverGalleryId, setDragOverGalleryId] = useState<string | null>(null);
@@ -61,6 +65,17 @@ export const SeatingBoxView: React.FC = () => {
       setSlidingJurorIds([]);
     }
   }, [activeCase?.id]);
+
+  // Close target seat modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && targetSeatModal) {
+        setTargetSeatModal(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [targetSeatModal]);
 
   // FLIP animation: smoothly animate jurors sliding into their new spots
   useLayoutEffect(() => {
@@ -268,6 +283,11 @@ export const SeatingBoxView: React.FC = () => {
       const jIdx = startIdx + c;
       rowJurors.push(jIdx < sortedJurors.length ? sortedJurors[jIdx] : null);
     }
+    // For top-right courtroom perspective (observer in back of court):
+    // Columns flow right-to-left so Juror #1 is in top-right seat
+    if (origin === 'top-right') {
+      rowJurors.reverse();
+    }
     rowsData.push({ rowNumber: r + 1, jurors: rowJurors });
   }
 
@@ -395,8 +415,12 @@ export const SeatingBoxView: React.FC = () => {
             : 'border-slate-800 hover:border-indigo-500/60 bg-slate-950/40 hover:bg-indigo-950/20'
         } group`}
       >
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-indigo-400">
+        <PlusCircle className="w-5 h-5 text-slate-500 group-hover:text-indigo-400 mb-1 transition-colors" />
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-indigo-300">
           {label}
+        </span>
+        <span className="text-[10px] text-slate-500 group-hover:text-indigo-400/80">
+          Click to Seat
         </span>
       </div>
     );
@@ -503,17 +527,58 @@ export const SeatingBoxView: React.FC = () => {
         )}
 
         {/* Alternates Bench */}
-        {alternateCount > 0 && (
-          <div className="pt-3 border-t border-slate-800/80">
-            <div className="text-[11px] font-semibold uppercase text-purple-400 tracking-wider mb-1.5 px-1 flex items-center space-x-1.5">
+        <div className="pt-3 border-t border-slate-800/80">
+          <div className="text-[11px] font-semibold uppercase text-purple-400 tracking-wider mb-2 px-1 flex items-center justify-between">
+            <div className="flex items-center space-x-1.5">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Alternate Juror Bench</span>
+              <span className="text-[10px] text-purple-300/70 font-mono">
+                ({alternateMap.size} of {alternateCount} Seated)
+              </span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-w-xl">
-              {alternateSeats.map(num => renderSeatSlot(num, true))}
+
+            <div className="flex items-center space-x-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (alternateCount > 0) {
+                    const lastAltJuror = alternateMap.get(alternateCount);
+                    if (lastAltJuror) {
+                      unseatJuror(lastAltJuror.id);
+                    }
+                    updateActiveCase({ alternateCount: alternateCount - 1 });
+                  }
+                }}
+                disabled={alternateCount === 0}
+                className="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                title="Remove an alternate seat"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  updateActiveCase({ alternateCount: alternateCount + 1 });
+                }}
+                disabled={alternateCount >= 8}
+                className="w-6 h-6 flex items-center justify-center rounded bg-purple-900/40 hover:bg-purple-800/60 border border-purple-700/60 text-purple-200 transition-colors"
+                title="Add an alternate seat"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
             </div>
           </div>
-        )}
+
+          {alternateCount > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
+              {alternateSeats.map(num => renderSeatSlot(num, true))}
+            </div>
+          ) : (
+            <div className="text-center py-2.5 text-slate-500 text-[11px] border border-dashed border-slate-800 rounded-lg">
+              No alternates configured. Click <span className="text-purple-400 font-bold">+</span> to add alternate seats.
+            </div>
+          )}
+        </div>
       </div>
 
       {/* SECTION 2: VENIRE GALLERY GRID (Replaces plain pool) */}
@@ -598,15 +663,18 @@ export const SeatingBoxView: React.FC = () => {
               </button>
             </div>
 
-            {/* Origin Toggle (Courtroom Bottom-Left vs Top-Left) */}
+            {/* Origin Toggle (Courtroom Bottom-Left vs Top-Left vs Top-Right) */}
             <button
-              onClick={() => updateActiveCase({ galleryOrigin: origin === 'bottom-left' ? 'top-left' : 'bottom-left' })}
-              className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200`}
-              title="Toggle between courtroom perspective (Juror #1 at bottom-left) and standard reading order"
+              onClick={() => {
+                const nextOrigin = origin === 'bottom-left' ? 'top-left' : origin === 'top-left' ? 'top-right' : 'bottom-left';
+                updateActiveCase({ galleryOrigin: nextOrigin });
+              }}
+              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200"
+              title="Toggle courtroom perspective: Bottom-Left #1, Top-Left #1, or Top-Right #1 (Seated in back of court)"
             >
               <Compass className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">
-                {origin === 'bottom-left' ? 'Bottom-Left #1' : 'Top-Left #1'}
+                {origin === 'bottom-left' ? 'Bottom-Left #1' : origin === 'top-right' ? 'Back (Top-Right #1)' : 'Top-Left #1'}
               </span>
             </button>
 
@@ -634,10 +702,14 @@ export const SeatingBoxView: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Top Label for Back of Courtroom (if bottom-left origin) */}
-            {origin === 'bottom-left' && (
+            {/* Top Label for Courtroom Orientation */}
+            {origin === 'bottom-left' ? (
               <div className="text-center py-1 bg-slate-950/60 border border-dashed border-slate-800 rounded-lg text-[11px] font-semibold text-slate-500 uppercase tracking-widest">
                 🚪 BACK OF COURTROOM / GALLERY ENTRANCE
+              </div>
+            ) : (
+              <div className="text-center py-1.5 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-900/40 rounded-xl text-xs font-bold text-indigo-300 uppercase tracking-widest shadow-inner">
+                ⚖️ WELL OF COURT / COUNSEL TABLES & JUDGE’S BENCH
               </div>
             )}
 
@@ -680,6 +752,7 @@ export const SeatingBoxView: React.FC = () => {
                                 const isDimmed = !matchesFilter(juror);
                                 const isOver = dragOverGalleryId === juror.id;
                                 const isSwapped = swappedJurorIds.includes(juror.id);
+                                const isStruck = juror.status.startsWith('struck_') || juror.status === 'cause_granted';
 
                                 return (
                                   <div
@@ -690,7 +763,7 @@ export const SeatingBoxView: React.FC = () => {
                                     }}
                                     onDragLeave={() => setDragOverGalleryId(null)}
                                     onDrop={(e) => handleGalleryDrop(e, juror)}
-                                    className={`relative rounded-xl transition-all duration-200 ${
+                                    className={`relative group rounded-xl transition-all duration-200 ${
                                       isOver ? 'ring-2 ring-indigo-400 scale-[1.03] z-10' : ''
                                     }`}
                                   >
@@ -701,6 +774,28 @@ export const SeatingBoxView: React.FC = () => {
                                       isDraggable={true}
                                       onDragStart={(e) => handleDragStart(e, juror.id)}
                                     />
+
+                                    {/* Strike for Cause from within Jury Pool */}
+                                    {!isStruck && (
+                                      <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                        <Tooltip
+                                          content="Strike for Cause (Granted)"
+                                          side="top"
+                                          align="right"
+                                        >
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              recordCauseChallenge(juror.id, juror.strikeIntentNote || 'Excused for cause by court', 'granted');
+                                            }}
+                                            className="bg-amber-950 hover:bg-amber-800 border border-amber-600 text-amber-200 rounded-full p-1 shadow transition-colors"
+                                            title="Strike for Cause (Granted)"
+                                          >
+                                            <ShieldAlert className="w-3 h-3 text-amber-300" />
+                                          </button>
+                                        </Tooltip>
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })}
@@ -724,15 +819,136 @@ export const SeatingBoxView: React.FC = () => {
               ))}
             </div>
 
-            {/* Well of Court / Judge's Bench Banner (if bottom-left origin) */}
-            {origin === 'bottom-left' && (
+            {/* Bottom Label for Courtroom Orientation */}
+            {origin === 'bottom-left' ? (
               <div className="text-center py-2 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-900/40 rounded-xl text-xs font-bold text-indigo-300 uppercase tracking-widest shadow-inner">
                 ⚖️ WELL OF COURT / COUNSEL TABLES & JUDGE’S BENCH
+              </div>
+            ) : origin === 'top-right' ? (
+              <div className="text-center py-1 bg-slate-950/60 border border-dashed border-slate-800 rounded-lg text-[11px] font-semibold text-slate-500 uppercase tracking-widest">
+                🚪 BACK OF COURTROOM (Observer Seated Here)
+              </div>
+            ) : (
+              <div className="text-center py-1 bg-slate-950/60 border border-dashed border-slate-800 rounded-lg text-[11px] font-semibold text-slate-500 uppercase tracking-widest">
+                🚪 BACK OF COURTROOM / GALLERY ENTRANCE
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* Target Seat Modal to select & seat a specific juror */}
+      {targetSeatModal && (
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setTargetSeatModal(null)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl p-5 space-y-4 max-h-[85vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h3 className="text-base font-bold text-slate-100 flex items-center space-x-2">
+                  <span>Seat Juror into</span>
+                  <span className="px-2 py-0.5 rounded bg-indigo-950 border border-indigo-700/60 text-indigo-300 font-mono text-sm">
+                    {targetSeatModal.isAlternate ? `Alternate ${targetSeatModal.seatNumber}` : `Panel Seat ${targetSeatModal.seatNumber}`}
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Select an unstruck pool juror to place into this seat.
+                </p>
+              </div>
+              <button
+                onClick={() => setTargetSeatModal(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                autoFocus
+                placeholder="Filter by juror #, name, occupation..."
+                value={targetSeatSearch}
+                onChange={e => setTargetSeatSearch(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 outline-none"
+              />
+            </div>
+
+            {/* Juror List */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[200px]">
+              {(() => {
+                const eligiblePoolJurors = jurors.filter(j => {
+                  const isStruck = j.status.startsWith('struck_') || j.status === 'cause_granted';
+                  if (isStruck || j.seatNumber) return false;
+                  if (!targetSeatSearch.trim()) return true;
+                  const q = targetSeatSearch.toLowerCase();
+                  return (
+                    j.jurorNumber.toLowerCase().includes(q) ||
+                    (j.fullName && j.fullName.toLowerCase().includes(q)) ||
+                    (j.occupation && j.occupation.toLowerCase().includes(q)) ||
+                    (j.notes && j.notes.toLowerCase().includes(q))
+                  );
+                });
+
+                if (eligiblePoolJurors.length === 0) {
+                  return (
+                    <div className="text-center py-10 text-xs text-slate-500">
+                      No unstruck pool jurors available to seat.
+                    </div>
+                  );
+                }
+
+                return eligiblePoolJurors.map(juror => (
+                  <div
+                    key={juror.id}
+                    onClick={() => {
+                      assignSeat(juror.id, targetSeatModal.seatNumber, targetSeatModal.isAlternate);
+                      setTargetSeatModal(null);
+                      setTargetSeatSearch('');
+                    }}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 hover:bg-indigo-950/40 border border-slate-800 hover:border-indigo-500/60 cursor-pointer transition-all group"
+                  >
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <span className="text-sm font-extrabold font-mono text-indigo-400 bg-indigo-950/60 border border-indigo-800/60 px-2 py-1 rounded-lg">
+                        #{juror.jurorNumber}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-slate-200 group-hover:text-white truncate">
+                          {juror.fullName || `Juror #${juror.jurorNumber}`}
+                        </div>
+                        <div className="text-[11px] text-slate-400 truncate">
+                          {juror.occupation || 'No occupation'} {juror.cityState ? `• ${juror.cityState}` : ''}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      {juror.rating !== 0 && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          juror.rating > 0
+                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                            : 'bg-rose-950 text-rose-300 border border-rose-700'
+                        }`}>
+                          {juror.rating > 0 ? `+${juror.rating}` : juror.rating}
+                        </span>
+                      )}
+                      <span className="text-xs font-semibold text-indigo-400 group-hover:text-indigo-300 px-2.5 py-1 rounded-lg bg-slate-900 group-hover:bg-indigo-900/60 border border-slate-800 group-hover:border-indigo-700/60 transition-colors">
+                        Seat Here →
+                      </span>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

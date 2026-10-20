@@ -38,6 +38,7 @@ interface CaseContextValue {
 
   // Question operations
   addQuestion: (text: string, category?: string) => Promise<Question>;
+  updateQuestion: (questionId: string, updates: Partial<Question>) => Promise<void>;
   deleteQuestion: (questionId: string) => Promise<void>;
   toggleJurorResponse: (jurorId: string, questionId: string) => Promise<void>;
 
@@ -310,6 +311,14 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await db.questions.add(newQ);
     setQuestions(prev => [...prev, newQ]);
     return newQ;
+  };
+
+  const updateQuestion = async (questionId: string, updates: Partial<Question>) => {
+    const existing = questions.find(q => q.id === questionId);
+    if (!existing) return;
+    const updated = { ...existing, ...updates };
+    await db.questions.put(updated);
+    setQuestions(prev => prev.map(q => q.id === questionId ? updated : q));
   };
 
   const deleteQuestion = async (questionId: string) => {
@@ -874,6 +883,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     unseatJuror,
     setJurorRating,
     addQuestion,
+    updateQuestion,
     deleteQuestion,
     toggleJurorResponse,
     recordPeremptoryStrike,

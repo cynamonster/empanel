@@ -69,7 +69,7 @@ export interface Case {
   gridRows: number;
   gridCols: number;
   galleryGutters?: 'none' | '1';
-  galleryOrigin?: 'bottom-left' | 'top-left';
+  galleryOrigin?: 'bottom-left' | 'top-left' | 'top-right';
   customSplits?: number[];
   galleryOrder?: string[]; // Array of juror IDs to preserve dragged gallery order
   autoFillPanel?: boolean; // Auto-prefill and pull in sequentially available jurors

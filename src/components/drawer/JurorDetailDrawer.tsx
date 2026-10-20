@@ -40,24 +40,105 @@ export const JurorDetailDrawer: React.FC = () => {
   const [causeRuling, setCauseRuling] = useState<'pending' | 'granted' | 'denied'>('granted');
 
   const notesRef = useRef<HTMLTextAreaElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
 
   const juror = jurors.find(j => j.id === selectedJurorId);
+  const [localNotes, setLocalNotes] = useState(juror?.notes || '');
 
+  useEffect(() => {
+    setLocalNotes(juror?.notes || '');
+  }, [juror?.id]);
+
+  // Auto-resize notes textarea
   useEffect(() => {
     if (notesRef.current) {
       notesRef.current.style.height = 'auto';
-      notesRef.current.style.height = `${Math.max(80, notesRef.current.scrollHeight)}px`;
+      notesRef.current.style.height = `${Math.max(72, notesRef.current.scrollHeight)}px`;
     }
-  }, [juror?.notes, juror?.id]);
+  }, [localNotes, juror?.id]);
+
+  // Close sidebar on ESCAPE key or tap-away outside
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedJurorId(null);
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
+        const target = e.target as HTMLElement;
+        // Do not close if clicking a juror card or modal
+        if (target.closest('[data-panel-card-id]') || target.closest('[data-juror-card]') || target.closest('.modal-container')) {
+          return;
+        }
+        setSelectedJurorId(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [setSelectedJurorId]);
 
   if (!juror) return null;
+
+  const boxSize = activeCase?.boxSize || 6;
+  const alternateCount = activeCase?.alternateCount || 1;
+
+  // Calculate open seats in prospective panel and alternate bench
+  const seatedNumbers = new Set(
+    jurors
+      .filter(j => j.seatNumber !== undefined && !j.isAlternate && !j.status.startsWith('struck_') && j.status !== 'cause_granted')
+      .map(j => j.seatNumber!)
+  );
+  const alternateNumbers = new Set(
+    jurors
+      .filter(j => j.seatNumber !== undefined && j.isAlternate && !j.status.startsWith('struck_') && j.status !== 'cause_granted')
+      .map(j => j.seatNumber!)
+  );
+
+  const openSeats: { seatNum: number; isAlt: boolean }[] = [];
+  for (let s = 1; s <= boxSize; s++) {
+    if (!seatedNumbers.has(s)) {
+      openSeats.push({ seatNum: s, isAlt: false });
+    }
+  }
+  for (let a = 1; a <= alternateCount; a++) {
+    if (!alternateNumbers.has(a)) {
+      openSeats.push({ seatNum: a, isAlt: true });
+    }
+  }
 
   const ratings = [-3, -2, -1, 0, 1, 2, 3];
 
   const isStruck = juror.status.startsWith('struck_') || juror.status === 'cause_granted';
 
+  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    const start = e.target.selectionStart;
+    const end = e.target.selectionEnd;
+    setLocalNotes(val);
+    updateJuror(juror.id, { notes: val });
+
+    if (notesRef.current) {
+      notesRef.current.style.height = 'auto';
+      notesRef.current.style.height = `${Math.max(72, notesRef.current.scrollHeight)}px`;
+      notesRef.current.setSelectionRange(start, end);
+    }
+  };
+
   return (
-    <aside className="w-80 md:w-96 bg-slate-900 border-l border-slate-800 flex flex-col h-full shadow-2xl z-20 flex-shrink-0 animate-in slide-in-from-right duration-200">
+    <aside
+      ref={drawerRef}
+      className="w-80 md:w-96 bg-slate-900 border-l border-slate-800 flex flex-col h-full shadow-2xl z-20 flex-shrink-0 animate-in slide-in-from-right duration-200"
+    >
       {/* Drawer Header */}
       <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
         <div className="flex items-center space-x-2">
@@ -218,6 +299,70 @@ export const JurorDetailDrawer: React.FC = () => {
           ) : null}
         </div>
 
+        {/* SECTION: SEATING IN PANEL */}
+        {!isStruck && (
+          <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                Panel Seating
+              </span>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                juror.seatNumber !== undefined
+                  ? 'bg-indigo-950/80 text-indigo-300 border border-indigo-700/60'
+                  : 'bg-slate-800 text-slate-400'
+              }`}>
+                {juror.seatNumber !== undefined
+                  ? juror.isAlternate
+                    ? `Alternate #${juror.seatNumber}`
+                    : `Panel Seat #${juror.seatNumber}`
+                  : 'In Jury Pool'}
+              </span>
+            </div>
+
+            {/* If not seated, check for open seats in prospective panel */}
+            {juror.seatNumber === undefined ? (
+              openSeats.length > 0 ? (
+                <div className="space-y-1.5 pt-1">
+                  <div className="text-[11px] text-emerald-400 font-medium flex items-center space-x-1">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>Open seats available in Prospective Panel:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {openSeats.map(({ seatNum, isAlt }) => (
+                      <button
+                        key={`${isAlt ? 'alt' : 'seat'}-${seatNum}`}
+                        type="button"
+                        onClick={() => assignSeat(juror.id, seatNum, isAlt)}
+                        className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow transition-colors flex items-center space-x-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Seat as {isAlt ? `Alt #${seatNum}` : `Seat #${seatNum}`}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-500 italic pt-0.5">
+                  Prospective panel is currently full ({boxSize}/{boxSize} seated).
+                </div>
+              )
+            ) : (
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[11px] text-slate-400">
+                  Assigned to {juror.isAlternate ? `Alternate #${juror.seatNumber}` : `Seat #${juror.seatNumber}`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => unseatJuror(juror.id)}
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-rose-300 border border-slate-700 rounded-lg text-xs font-medium transition-colors"
+                >
+                  Return to Pool
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* SECTION: RAPID NOTES */}
         <div>
           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
@@ -227,14 +372,8 @@ export const JurorDetailDrawer: React.FC = () => {
             ref={notesRef}
             rows={3}
             placeholder="Type notes during questioning, demeanor observations, quotes..."
-            value={juror.notes || ''}
-            onChange={e => {
-              updateJuror(juror.id, { notes: e.target.value });
-              if (notesRef.current) {
-                notesRef.current.style.height = 'auto';
-                notesRef.current.style.height = `${Math.max(72, notesRef.current.scrollHeight)}px`;
-              }
-            }}
+            value={localNotes}
+            onChange={handleNotesChange}
             className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-600 outline-none resize-none leading-relaxed overflow-hidden"
           />
         </div>

@@ -259,6 +259,7 @@ export const CaseSettingsModal: React.FC<CaseSettingsModalProps> = ({ isOpen, on
               >
                 <option value="bottom-left">Juror #1 at Bottom-Left (Courtroom View)</option>
                 <option value="top-left">Juror #1 at Top-Left</option>
+                <option value="top-right">Juror #1 at Top-Right (Back of Court View)</option>
               </select>
             </div>
           </div>

@@ -129,6 +129,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
 
   return (
     <div
+      data-juror-card={juror.id}
       draggable={isDraggable && !activeQuestionId}
       onDragStart={onDragStart}
       onDragOver={onDragOver}

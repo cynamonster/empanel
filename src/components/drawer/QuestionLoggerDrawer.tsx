@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCase } from '../../context/CaseContext';
-import { Hand, Plus, Trash2, CheckCircle2, ChevronRight, X } from 'lucide-react';
+import { Hand, Plus, Trash2, CheckCircle2, ChevronRight, X, Edit3 } from 'lucide-react';
+import type { Question } from '../../types';
 
 export const QuestionLoggerDrawer: React.FC = () => {
   const {
@@ -10,11 +11,27 @@ export const QuestionLoggerDrawer: React.FC = () => {
     activeQuestionId,
     setActiveQuestionId,
     addQuestion,
+    updateQuestion,
     deleteQuestion,
   } = useCase();
 
   const [newQuestionText, setNewQuestionText] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [editText, setEditText] = useState('');
+
+  // Close modals or exit logger on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showAddForm) setShowAddForm(false);
+        else if (editingQuestion) setEditingQuestion(null);
+        else setActiveQuestionId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showAddForm, editingQuestion, setActiveQuestionId]);
 
   if (!activeQuestionId) return null;
 
@@ -32,6 +49,19 @@ export const QuestionLoggerDrawer: React.FC = () => {
     setActiveQuestionId(created.id);
     setNewQuestionText('');
     setShowAddForm(false);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingQuestion || !editText.trim()) return;
+    await updateQuestion(editingQuestion.id, { text: editText.trim() });
+    setEditingQuestion(null);
+  };
+
+  const handleDelete = async (questionId: string) => {
+    if (confirm('Delete this question from the case? Juror responses to this question will be cleared.')) {
+      await deleteQuestion(questionId);
+    }
   };
 
   return (
@@ -61,7 +91,7 @@ export const QuestionLoggerDrawer: React.FC = () => {
         <span>👉 Tap any juror card in the seating chart or grid to toggle hand raised!</span>
       </div>
 
-      {/* Right: Question Switcher & Add Form */}
+      {/* Right: Question Switcher & Controls */}
       <div className="flex items-center space-x-2">
         {questions.length > 0 && (
           <select
@@ -84,6 +114,29 @@ export const QuestionLoggerDrawer: React.FC = () => {
           </select>
         )}
 
+        {currentQuestion && (
+          <>
+            <button
+              onClick={() => {
+                setEditingQuestion(currentQuestion);
+                setEditText(currentQuestion.text);
+              }}
+              className="p-1.5 bg-slate-900/80 hover:bg-slate-800 border border-amber-700/50 rounded-lg text-amber-300 hover:text-white transition-colors"
+              title="Edit Question Text"
+            >
+              <Edit3 className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => handleDelete(currentQuestion.id)}
+              className="p-1.5 bg-slate-900/80 hover:bg-rose-950/80 border border-amber-700/50 hover:border-rose-700 rounded-lg text-amber-300 hover:text-rose-400 transition-colors"
+              title="Delete Question"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </>
+        )}
+
         <button
           onClick={() => setShowAddForm(true)}
           className="flex items-center space-x-1 px-2.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-lg text-xs transition-colors"
@@ -95,11 +148,68 @@ export const QuestionLoggerDrawer: React.FC = () => {
         <button
           onClick={() => setActiveQuestionId(null)}
           className="p-1.5 bg-slate-900/80 hover:bg-slate-800 border border-amber-700/50 rounded-lg text-amber-300 hover:text-white transition-colors"
-          title="Exit Question Logger Mode"
+          title="Exit Question Logger Mode (Esc)"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Edit Question Modal */}
+      {editingQuestion && (
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-slate-100"
+          onClick={() => setEditingQuestion(null)}
+        >
+          <form
+            onSubmit={handleEditSubmit}
+            onClick={e => e.stopPropagation()}
+            className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <h3 className="font-bold text-slate-100 text-sm flex items-center space-x-2">
+                <Edit3 className="w-4 h-4 text-amber-400" />
+                <span>Edit Question</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditingQuestion(null)}
+                className="text-slate-400 hover:text-slate-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                Question Text:
+              </label>
+              <textarea
+                rows={3}
+                value={editText}
+                onChange={e => setEditText(e.target.value)}
+                autoFocus
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-amber-500 leading-relaxed"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditingQuestion(null)}
+                className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-lg text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs"
+              >
+                Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* New Question Modal */}
       {showAddForm && (

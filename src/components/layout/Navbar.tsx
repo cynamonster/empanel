@@ -218,10 +218,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Roster Intake Button */}
         <button
           onClick={onOpenIntake}
-          className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-xs text-slate-300 transition-colors"
+          className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all ${
+            jurors.length === 0
+              ? 'bg-emerald-600 hover:bg-emerald-500 text-white font-bold border border-emerald-400 ring-2 ring-emerald-400/50 shadow-lg shadow-emerald-900/40 animate-pulse'
+              : 'bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300'
+          }`}
           title="Import Juror Roster"
         >
-          <UserPlus className="w-3.5 h-3.5 text-emerald-400" />
+          <UserPlus className={`w-3.5 h-3.5 ${jurors.length === 0 ? 'text-white' : 'text-emerald-400'}`} />
           <span className="hidden sm:inline">Add Jurors</span>
         </button>
 
