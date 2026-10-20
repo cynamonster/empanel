@@ -318,7 +318,7 @@ export const SeatingBoxView: React.FC = () => {
 
           {/* Strike for Cause button on top-left hover */}
           <div className="absolute -top-2.5 -left-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
-            <Tooltip content="Strike for Cause (Granted)" side="top" align="left">
+            <Tooltip content="Struck for Cause" side="top" align="left">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -329,7 +329,7 @@ export const SeatingBoxView: React.FC = () => {
                   );
                 }}
                 className="bg-amber-950 hover:bg-amber-800 border border-amber-600 text-amber-200 rounded-full p-1 shadow transition-colors"
-                title="Strike for Cause (Granted)"
+                title="Struck for Cause"
               >
                 <ShieldAlert className="w-3.5 h-3.5 text-amber-300" />
               </button>
@@ -339,7 +339,7 @@ export const SeatingBoxView: React.FC = () => {
           {/* Quick Strike Buttons on top-right hover */}
           <div className="absolute -top-2.5 right-1 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
             <Tooltip
-              content={`Quick Peremptory Strike (${activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'})`}
+              content={`Struck Peremptorily (${activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'})`}
               side="top"
               align="right"
             >
@@ -349,14 +349,14 @@ export const SeatingBoxView: React.FC = () => {
                   recordPeremptoryStrike(juror.id, 'plaintiff_prosecution');
                 }}
                 className="bg-rose-950 hover:bg-rose-800 border border-rose-600 text-rose-200 rounded-full p-1 shadow transition-colors"
-                title={`Quick Peremptory Strike (${activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'})`}
+                title={`Struck Peremptorily (${activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'})`}
               >
                 <Gavel className="w-3 h-3 text-rose-300" />
               </button>
             </Tooltip>
 
             <Tooltip
-              content="Quick Peremptory Strike (Defense)"
+              content="Struck Peremptorily (Defense)"
               side="top"
               align="right"
             >
@@ -366,7 +366,7 @@ export const SeatingBoxView: React.FC = () => {
                   recordPeremptoryStrike(juror.id, 'defense');
                 }}
                 className="bg-blue-950 hover:bg-blue-800 border border-blue-600 text-blue-200 rounded-full p-1 shadow transition-colors"
-                title="Quick Peremptory Strike (Defense)"
+                title="Struck Peremptorily (Defense)"
               >
                 <Gavel className="w-3 h-3 text-blue-300" />
               </button>

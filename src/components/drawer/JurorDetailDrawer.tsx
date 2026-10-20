@@ -83,10 +83,24 @@ export const JurorDetailDrawer: React.FC = () => {
 
       {/* Drawer Body */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5 text-xs text-slate-300">
+
+        {/* SECTION: SEATING POSITION */}
+        <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+          <div>
+            <div className="font-semibold text-slate-200">
+              {juror.seatNumber !== undefined
+                ? juror.isAlternate
+                  ? `Alternate #${juror.seatNumber}`
+                  : `Prospective Juror #${juror.seatNumber}`
+                : 'Not in Jury Panel'}
+            </div>
+          </div>
+        </div>
+
         {/* SECTION: TACTICAL RATING */}
         <div>
           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
-            Favorability Rating (-3 to +3)
+            Favorability Rating
           </label>
           <div className="grid grid-cols-7 gap-1 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
             {ratings.map(val => {
@@ -102,7 +116,7 @@ export const JurorDetailDrawer: React.FC = () => {
                   key={val}
                   onClick={() => updateJuror(juror.id, { rating: val })}
                   className={`py-1.5 rounded-lg text-center font-mono text-xs transition-colors ${bg}`}
-                  title={val > 0 ? `+${val} Favor Our Side` : val < 0 ? `${val} Favor Opponent` : '0 Neutral'}
+                  title={val > 0 ? `+${val} Favors Us` : val < 0 ? `${val} Favors Them` : '0 Neutral'}
                 >
                   {val > 0 ? `+${val}` : val}
                 </button>
@@ -110,9 +124,9 @@ export const JurorDetailDrawer: React.FC = () => {
             })}
           </div>
           <div className="flex justify-between text-[10px] text-slate-500 mt-1 px-1">
-            <span>Favor Opponent</span>
+            <span>Favors Them</span>
             <span>Neutral</span>
-            <span>Favor Our Side</span>
+            <span>Favors Us</span>
           </div>
         </div>
 
@@ -201,46 +215,7 @@ export const JurorDetailDrawer: React.FC = () => {
                 <span>Revert Strike</span>
               </button>
             </div>
-          ) : juror.seatNumber !== undefined ? (
-            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-              <div className="flex items-center space-x-1.5">
-                <button
-                  onClick={() => recordPeremptoryStrike(juror.id, 'defense')}
-                  className="px-2 py-1 bg-blue-950/70 hover:bg-blue-900 border border-blue-700 text-blue-300 rounded text-[10px] font-semibold"
-                  title="Execute official defense peremptory strike in court"
-                >
-                  Strike (Defense)
-                </button>
-                <button
-                  onClick={() => recordPeremptoryStrike(juror.id, 'plaintiff_prosecution')}
-                  className="px-2 py-1 bg-rose-950/70 hover:bg-rose-900 border border-rose-700 text-rose-300 rounded text-[10px] font-semibold"
-                  title={`Execute official ${activeCase?.caseType === 'criminal' ? 'prosecution' : 'plaintiff'} peremptory strike in court`}
-                >
-                  Strike ({activeCase?.caseType === 'criminal' ? 'Pros' : 'Plf'})
-                </button>
-                <button
-                  onClick={() => setShowCauseModal(true)}
-                  className="px-2 py-1 bg-amber-950/70 hover:bg-amber-900 border border-amber-700 text-amber-300 rounded text-[10px] font-semibold"
-                  title="Raise official cause challenge in court"
-                >
-                  Cause Challenge
-                </button>
-              </div>
-            </div>
           ) : null}
-        </div>
-
-        {/* SECTION: SEATING POSITION */}
-        <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-          <div>
-            <div className="font-semibold text-slate-200">
-              {juror.seatNumber !== undefined
-                ? juror.isAlternate
-                  ? `Alternate #${juror.seatNumber}`
-                  : `Prospective Juror #${juror.seatNumber}`
-                : 'Not in Jury Panel'}
-            </div>
-          </div>
         </div>
 
         {/* SECTION: RAPID NOTES */}
