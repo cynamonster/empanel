@@ -1,5 +1,5 @@
 {
-  "name": "voir-dire-pwa",
+  "name": "empanel",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -27,6 +27,6 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^6.0.0"
   }
 }
