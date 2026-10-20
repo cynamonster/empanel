@@ -98,7 +98,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
               className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-blue-950/80 text-blue-300 border border-blue-700/80"
               title={juror.strikeIntentNote ? `Note: ${juror.strikeIntentNote}` : 'Strike Plan: Peremptory'}
             >
-              PLAN: (D)
+              Peremptory
             </span>
           );
         }
@@ -108,7 +108,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
               className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-950/80 text-amber-300 border border-amber-700/80"
               title={juror.strikeIntentNote ? `Note: ${juror.strikeIntentNote}` : 'Strike Plan: For Cause'}
             >
-              PLAN: CAUSE
+              Cause
             </span>
           );
         }

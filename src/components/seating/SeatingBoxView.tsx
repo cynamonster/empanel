@@ -8,6 +8,7 @@ import {
   PlusCircle,
   XCircle,
   ShieldCheck,
+  ShieldAlert,
   Zap,
   Sparkles,
   Gavel,
@@ -31,6 +32,7 @@ export const SeatingBoxView: React.FC = () => {
     assignSeat,
     unseatJuror,
     recordPeremptoryStrike,
+    recordCauseChallenge,
     prefillSequentialPanel,
     clearPanel,
     toggleAutoFillPanel,
@@ -314,18 +316,22 @@ export const SeatingBoxView: React.FC = () => {
             />
           </div>
 
-          {/* Unseat button on top-left hover */}
+          {/* Strike for Cause button on top-left hover */}
           <div className="absolute -top-2.5 -left-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
-            <Tooltip content="Return juror to pool (unseat)" side="top" align="left">
+            <Tooltip content="Strike for Cause (Granted)" side="top" align="left">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  unseatJuror(juror.id);
+                  recordCauseChallenge(
+                    juror.id,
+                    juror.strikeIntentNote || 'Excused for cause by court',
+                    'granted'
+                  );
                 }}
-                className="bg-slate-900 hover:bg-rose-950/80 border border-slate-700 hover:border-rose-600 text-slate-400 hover:text-rose-300 rounded-full p-1 shadow transition-colors"
-                title="Return juror to pool (unseat)"
+                className="bg-amber-950 hover:bg-amber-800 border border-amber-600 text-amber-200 rounded-full p-1 shadow transition-colors"
+                title="Strike for Cause (Granted)"
               >
-                <XCircle className="w-3.5 h-3.5" />
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-300" />
               </button>
             </Tooltip>
           </div>
