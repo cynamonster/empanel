@@ -11,7 +11,8 @@ import {
   Sparkles,
   Gavel,
   Compass,
-  Grid
+  Grid,
+  Trash2
 } from 'lucide-react';
 import type { Juror } from '../../types';
 
@@ -30,6 +31,7 @@ export const SeatingBoxView: React.FC = () => {
     unseatJuror,
     recordPeremptoryStrike,
     prefillSequentialPanel,
+    clearPanel,
     toggleAutoFillPanel,
     updateActiveCase,
     reorderGalleryJurors,
@@ -274,7 +276,7 @@ export const SeatingBoxView: React.FC = () => {
   // Render a single seat slot in the Prospective Panel
   const renderSeatSlot = (seatNum: number, isAlt = false) => {
     const juror = isAlt ? alternateMap.get(seatNum) : seatedMap.get(seatNum);
-    const label = isAlt ? `Alt ${seatNum}` : `Seat ${seatNum}`;
+    const label = isAlt ? `Alt ${seatNum}` : `Juror ${seatNum}`;
     const slotKey = `${isAlt ? 'alt' : 'seat'}-${seatNum}`;
     const isOver = dragOverSeat === slotKey;
 
@@ -373,10 +375,6 @@ export const SeatingBoxView: React.FC = () => {
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-indigo-400">
           {label}
         </span>
-        <PlusCircle className="w-5 h-5 text-slate-600 group-hover:text-indigo-400 my-1 transition-colors" />
-        <span className="text-[10px] text-slate-600 group-hover:text-slate-400">
-          {isOver ? 'Drop to Seat' : 'Click to Seat'}
-        </span>
       </div>
     );
   };
@@ -425,6 +423,17 @@ export const SeatingBoxView: React.FC = () => {
             >
               <Sparkles className="w-3.5 h-3.5 text-indigo-200" />
               <span>Prefill Sequential Panel</span>
+            </button>
+
+            {/* Clear Prospective Jury Panel Button */}
+            <button
+              onClick={() => clearPanel()}
+              disabled={seatedMap.size === 0 && alternateMap.size === 0}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-rose-950/60 hover:border-rose-700/80 hover:text-rose-300 text-slate-300 border border-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all disabled:opacity-40 disabled:hover:bg-slate-800 disabled:hover:border-slate-700 disabled:hover:text-slate-300 disabled:cursor-not-allowed"
+              title="Clear all seated jurors from the Prospective Panel and return them to the unseated pool"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>Clear Panel</span>
             </button>
           </div>
         </div>

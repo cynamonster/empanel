@@ -54,6 +54,7 @@ interface CaseContextValue {
 
   // Prospective Panel Auto-Fill & Refill
   prefillSequentialPanel: (enableAutoFill?: boolean) => Promise<void>;
+  clearPanel: () => Promise<void>;
   toggleAutoFillPanel: () => Promise<void>;
 
   // Gallery Dragging & Reordering
@@ -725,6 +726,27 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const clearPanel = async () => {
+    if (!activeCase) return;
+    pushSnapshot();
+
+    const updatedJurors = jurors.map(j => {
+      if (j.seatNumber !== undefined) {
+        return {
+          ...j,
+          seatNumber: undefined,
+          isAlternate: false,
+          status: j.status === 'seated' || j.status === 'alternate' ? ('active' as const) : j.status,
+          updatedAt: Date.now(),
+        };
+      }
+      return j;
+    });
+
+    await db.jurors.bulkPut(updatedJurors);
+    setJurors(updatedJurors);
+  };
+
   const toggleAutoFillPanel = async () => {
     if (!activeCase) return;
     const nextVal = !activeCase.autoFillPanel;
@@ -865,6 +887,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     undo,
     redo,
     prefillSequentialPanel,
+    clearPanel,
     toggleAutoFillPanel,
     reorderGalleryJurors,
     updateAisleSplits,
