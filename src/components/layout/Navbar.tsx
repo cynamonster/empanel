@@ -19,6 +19,7 @@ import {
   Redo2
 } from 'lucide-react';
 import { exportJurorsToCSV, exportCaseBackupJSON } from '../../utils/exportUtils';
+import { Tooltip } from '../common/Tooltip';
 
 interface NavbarProps {
   onOpenIntake: () => void;
@@ -144,45 +145,51 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="flex items-center space-x-2 md:space-x-3">
         {/* Undo & Redo History Controls */}
         <div className="flex items-center space-x-0.5 bg-slate-800 p-0.5 rounded-lg border border-slate-700">
-          <button
-            disabled={!canUndo}
-            onClick={() => undo()}
-            className="p-1.5 rounded text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-300 transition-colors"
-            title="Undo (Ctrl+Z / ⌘Z)"
-          >
-            <Undo2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            disabled={!canRedo}
-            onClick={() => redo()}
-            className="p-1.5 rounded text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-300 transition-colors"
-            title="Redo (Ctrl+Shift+Z / ⌘⇧Z)"
-          >
-            <Redo2 className="w-3.5 h-3.5" />
-          </button>
+          <Tooltip content="Undo (Ctrl+Z / ⌘Z)" side="bottom">
+            <button
+              disabled={!canUndo}
+              onClick={() => undo()}
+              className="p-1.5 rounded text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-300 transition-colors"
+              title="Undo (Ctrl+Z / ⌘Z)"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Redo (Ctrl+Shift+Z / ⌘⇧Z)" side="bottom">
+            <button
+              disabled={!canRedo}
+              onClick={() => redo()}
+              className="p-1.5 rounded text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-300 transition-colors"
+              title="Redo (Ctrl+Shift+Z / ⌘⇧Z)"
+            >
+              <Redo2 className="w-3.5 h-3.5" />
+            </button>
+          </Tooltip>
         </div>
 
         {/* Live Strike Tally Badge */}
-        <button
-          onClick={onOpenStrikeConsole}
-          className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-xs transition-colors"
-          title="Open Strategic Strike Console"
-        >
-          <Gavel className="w-3.5 h-3.5 text-amber-400" />
-          <div className="flex items-center space-x-2">
-            <span className="font-semibold text-slate-300 hidden md:inline">Strikes:</span>
-            <span
-              className="text-rose-400 font-mono font-medium"
-              title={`${activeCase?.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'} Remaining`}
-            >
-              {activeCase?.caseType === 'criminal' ? 'Pros' : 'P'}: {pRemaining}/{activeCase?.plaintiffStrikesAllowed || 3}
-            </span>
-            <span className="text-slate-600">|</span>
-            <span className="text-blue-400 font-mono font-medium" title="Defense Remaining">
-              D: {dRemaining}/{activeCase?.defenseStrikesAllowed || 3}
-            </span>
-          </div>
-        </button>
+        <Tooltip content="Open Strategic Strike Console" side="bottom">
+          <button
+            onClick={onOpenStrikeConsole}
+            className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-xs transition-colors"
+            title="Open Strategic Strike Console"
+          >
+            <Gavel className="w-3.5 h-3.5 text-amber-400" />
+            <div className="flex items-center space-x-2">
+              <span className="font-semibold text-slate-300 hidden md:inline">Strikes:</span>
+              <span
+                className="text-rose-400 font-mono font-medium"
+                title={`${activeCase?.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'} Remaining`}
+              >
+                {activeCase?.caseType === 'criminal' ? 'Pros' : 'P'}: {pRemaining}/{activeCase?.plaintiffStrikesAllowed || 3}
+              </span>
+              <span className="text-slate-600">|</span>
+              <span className="text-blue-400 font-mono font-medium" title="Defense Remaining">
+                D: {dRemaining}/{activeCase?.defenseStrikesAllowed || 3}
+              </span>
+            </div>
+          </button>
+        </Tooltip>
 
         {/* Group Question Mode Toggle */}
         <button

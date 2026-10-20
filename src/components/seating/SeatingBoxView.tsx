@@ -1,6 +1,7 @@
 import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { useCase } from '../../context/CaseContext';
 import { JurorCard } from './JurorCard';
+import { Tooltip } from '../common/Tooltip';
 import {
   Users,
   Search,
@@ -314,39 +315,56 @@ export const SeatingBoxView: React.FC = () => {
           </div>
 
           {/* Unseat button on top-left hover */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              unseatJuror(juror.id);
-            }}
-            className="absolute -top-2 -left-2 bg-slate-900 border border-slate-700 text-slate-400 hover:text-rose-400 hover:border-rose-600 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow z-20"
-            title="Remove from seat (return to pool)"
-          >
-            <XCircle className="w-3.5 h-3.5" />
-          </button>
+          <div className="absolute -top-2.5 -left-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
+            <Tooltip content="Return juror to pool (unseat)" side="top" align="left">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  unseatJuror(juror.id);
+                }}
+                className="bg-slate-900 hover:bg-rose-950/80 border border-slate-700 hover:border-rose-600 text-slate-400 hover:text-rose-300 rounded-full p-1 shadow transition-colors"
+                title="Return juror to pool (unseat)"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
+          </div>
 
           {/* Quick Strike Buttons on top-right hover */}
-          <div className="absolute -top-2.5 right-1 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                recordPeremptoryStrike(juror.id, 'plaintiff_prosecution');
-              }}
-              className="bg-rose-950 hover:bg-rose-800 border border-rose-600 text-rose-200 rounded-full p-1 shadow transition-colors"
-              title={`Quick Peremptory Strike (${activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'})`}
+          <div className="absolute -top-2.5 right-1 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
+            <Tooltip
+              content={`Quick Peremptory Strike (${activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'})`}
+              side="top"
+              align="right"
             >
-              <Gavel className="w-3 h-3 text-rose-300" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                recordPeremptoryStrike(juror.id, 'defense');
-              }}
-              className="bg-blue-950 hover:bg-blue-800 border border-blue-600 text-blue-200 rounded-full p-1 shadow transition-colors"
-              title="Quick Peremptory Strike (Defense)"
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  recordPeremptoryStrike(juror.id, 'plaintiff_prosecution');
+                }}
+                className="bg-rose-950 hover:bg-rose-800 border border-rose-600 text-rose-200 rounded-full p-1 shadow transition-colors"
+                title={`Quick Peremptory Strike (${activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'})`}
+              >
+                <Gavel className="w-3 h-3 text-rose-300" />
+              </button>
+            </Tooltip>
+
+            <Tooltip
+              content="Quick Peremptory Strike (Defense)"
+              side="top"
+              align="right"
             >
-              <Gavel className="w-3 h-3 text-blue-300" />
-            </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  recordPeremptoryStrike(juror.id, 'defense');
+                }}
+                className="bg-blue-950 hover:bg-blue-800 border border-blue-600 text-blue-200 rounded-full p-1 shadow transition-colors"
+                title="Quick Peremptory Strike (Defense)"
+              >
+                <Gavel className="w-3 h-3 text-blue-300" />
+              </button>
+            </Tooltip>
           </div>
         </div>
       );
