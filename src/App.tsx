@@ -39,7 +39,7 @@ const CourtroomWorkspace: React.FC = () => {
         </main>
 
         {/* Right Collapsible Context Drawer: Juror Profiling & Courtroom Action */}
-        {selectedJurorId && <JurorDetailDrawer />}
+        <JurorDetailDrawer />
       </div>
 
       {/* Modals */}

@@ -17,6 +17,7 @@ import {
   GraduationCap,
   FileEdit
 } from 'lucide-react';
+import type { Juror } from '../../types';
 
 export const JurorDetailDrawer: React.FC = () => {
   const {
@@ -40,38 +41,92 @@ export const JurorDetailDrawer: React.FC = () => {
   const [causeRuling, setCauseRuling] = useState<'pending' | 'granted' | 'denied'>('granted');
 
   const notesRef = useRef<HTMLTextAreaElement>(null);
+  const strikeNoteRef = useRef<HTMLTextAreaElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
 
-  const juror = jurors.find(j => j.id === selectedJurorId);
+  const currentJuror = jurors.find(j => j.id === selectedJurorId);
+  const lastJurorRef = useRef<Juror | null>(null);
+  if (currentJuror) {
+    lastJurorRef.current = currentJuror;
+  }
+  const juror = currentJuror || lastJurorRef.current;
+  const isOpen = Boolean(selectedJurorId && juror);
+
   const [localNotes, setLocalNotes] = useState(juror?.notes || '');
+  const [localStrikeNote, setLocalStrikeNote] = useState(juror?.strikeIntentNote || '');
+
+  // Debounced auto-save for textareas to prevent cursor jump & rerender lag
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingUpdatesRef = useRef<Partial<Juror>>({});
+  const activeJurorIdRef = useRef<string | undefined>(juror?.id);
+
+  const flushUpdates = (targetId?: string) => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const idToUpdate = targetId || activeJurorIdRef.current;
+    if (idToUpdate && Object.keys(pendingUpdatesRef.current).length > 0) {
+      updateJuror(idToUpdate, pendingUpdatesRef.current);
+      pendingUpdatesRef.current = {};
+    }
+  };
+
+  const scheduleUpdate = (updates: Partial<Juror>) => {
+    pendingUpdatesRef.current = { ...pendingUpdatesRef.current, ...updates };
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      flushUpdates();
+    }, 250);
+  };
 
   useEffect(() => {
-    setLocalNotes(juror?.notes || '');
+    if (activeJurorIdRef.current && activeJurorIdRef.current !== juror?.id) {
+      flushUpdates(activeJurorIdRef.current);
+    }
+    activeJurorIdRef.current = juror?.id;
+    if (juror) {
+      setLocalNotes(juror.notes || '');
+      setLocalStrikeNote(juror.strikeIntentNote || '');
+    }
+
+    // Auto-fit height when switching juror
+    requestAnimationFrame(() => {
+      if (notesRef.current) {
+        notesRef.current.style.height = 'auto';
+        notesRef.current.style.height = `${Math.max(72, notesRef.current.scrollHeight)}px`;
+      }
+      if (strikeNoteRef.current) {
+        strikeNoteRef.current.style.height = 'auto';
+        strikeNoteRef.current.style.height = `${Math.max(52, strikeNoteRef.current.scrollHeight)}px`;
+      }
+    });
   }, [juror?.id]);
 
-  // Auto-resize notes textarea
   useEffect(() => {
-    if (notesRef.current) {
-      notesRef.current.style.height = 'auto';
-      notesRef.current.style.height = `${Math.max(72, notesRef.current.scrollHeight)}px`;
-    }
-  }, [localNotes, juror?.id]);
+    return () => {
+      flushUpdates();
+    };
+  }, []);
 
   // Close sidebar on ESCAPE key or tap-away outside
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && selectedJurorId) {
+        flushUpdates();
         setSelectedJurorId(null);
       }
     };
 
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (!selectedJurorId) return;
       if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
         const target = e.target as HTMLElement;
         // Do not close if clicking a juror card or modal
         if (target.closest('[data-panel-card-id]') || target.closest('[data-juror-card]') || target.closest('.modal-container')) {
           return;
         }
+        flushUpdates();
         setSelectedJurorId(null);
       }
     };
@@ -85,9 +140,16 @@ export const JurorDetailDrawer: React.FC = () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [setSelectedJurorId]);
+  }, [selectedJurorId, setSelectedJurorId]);
 
-  if (!juror) return null;
+  if (!juror) {
+    return (
+      <aside
+        ref={drawerRef}
+        className="w-0 translate-x-full opacity-0 pointer-events-none border-l-0 overflow-hidden flex-shrink-0 h-full bg-slate-900 transition-all duration-200 ease-in-out"
+      />
+    );
+  }
 
   const boxSize = activeCase?.boxSize || 6;
   const alternateCount = activeCase?.alternateCount || 1;
@@ -125,26 +187,55 @@ export const JurorDetailDrawer: React.FC = () => {
     const start = e.target.selectionStart;
     const end = e.target.selectionEnd;
     setLocalNotes(val);
-    updateJuror(juror.id, { notes: val });
+    scheduleUpdate({ notes: val });
 
-    if (notesRef.current) {
-      notesRef.current.style.height = 'auto';
-      notesRef.current.style.height = `${Math.max(72, notesRef.current.scrollHeight)}px`;
-      notesRef.current.setSelectionRange(start, end);
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(72, el.scrollHeight)}px`;
+    if (start !== null && end !== null) {
+      requestAnimationFrame(() => {
+        if (document.activeElement === el) {
+          el.setSelectionRange(start, end);
+        }
+      });
+    }
+  };
+
+  const handleStrikeNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    const start = e.target.selectionStart;
+    const end = e.target.selectionEnd;
+    setLocalStrikeNote(val);
+    scheduleUpdate({ strikeIntentNote: val });
+
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(52, el.scrollHeight)}px`;
+    if (start !== null && end !== null) {
+      requestAnimationFrame(() => {
+        if (document.activeElement === el) {
+          el.setSelectionRange(start, end);
+        }
+      });
     }
   };
 
   return (
     <aside
       ref={drawerRef}
-      className="w-80 md:w-96 bg-slate-900 border-l border-slate-800 flex flex-col h-full shadow-2xl z-20 flex-shrink-0 animate-in slide-in-from-right duration-200"
+      className={`transition-all duration-200 ease-in-out flex-shrink-0 h-full bg-slate-900 border-l border-slate-800 flex flex-col shadow-2xl z-20 overflow-hidden ${
+        isOpen
+          ? 'w-80 md:w-96 translate-x-0 opacity-100'
+          : 'w-0 translate-x-full opacity-0 pointer-events-none border-l-0'
+      }`}
     >
-      {/* Drawer Header */}
-      <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
-        <div className="flex items-center space-x-2">
-          <span className="font-mono text-xl font-black text-indigo-400 bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-800/50">
-            #{juror.jurorNumber}
-          </span>
+      <div className="w-80 md:w-96 h-full flex flex-col flex-shrink-0">
+        {/* Drawer Header */}
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
+          <div className="flex items-center space-x-2">
+            <span className="font-mono text-xl font-black text-indigo-400 bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-800/50">
+              #{juror.jurorNumber}
+            </span>
           <div className="overflow-hidden">
             <h3 className="font-bold text-sm text-slate-100 truncate">
               {juror.fullName}
@@ -155,7 +246,10 @@ export const JurorDetailDrawer: React.FC = () => {
           </div>
         </div>
         <button
-          onClick={() => setSelectedJurorId(null)}
+          onClick={() => {
+            flushUpdates();
+            setSelectedJurorId(null);
+          }}
           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
         >
           <X className="w-4 h-4" />
@@ -274,11 +368,13 @@ export const JurorDetailDrawer: React.FC = () => {
               Reason / Bias:
             </span>
             <textarea
+              ref={strikeNoteRef}
               rows={2}
-              value={juror.strikeIntentNote || ''}
-              onChange={e => updateJuror(juror.id, { strikeIntentNote: e.target.value })}
+              value={localStrikeNote}
+              onChange={handleStrikeNoteChange}
+              onBlur={() => flushUpdates()}
               placeholder="e.g. Hostile demeanor, sister arrested in similar case, admitted hesitation on beyond reasonable doubt..."
-              className="w-full bg-slate-900 border border-slate-700/80 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-600 outline-none focus:border-indigo-500 resize-none"
+              className="w-full bg-slate-900 border border-slate-700/80 focus:border-indigo-500 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-600 outline-none resize-none leading-relaxed overflow-hidden"
             />
           </div>
 
@@ -374,6 +470,7 @@ export const JurorDetailDrawer: React.FC = () => {
             placeholder="Type notes during questioning, demeanor observations, quotes..."
             value={localNotes}
             onChange={handleNotesChange}
+            onBlur={() => flushUpdates()}
             className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-600 outline-none resize-none leading-relaxed overflow-hidden"
           />
         </div>
@@ -596,6 +693,7 @@ export const JurorDetailDrawer: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
     </aside>
   );
 };

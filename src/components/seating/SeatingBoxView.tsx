@@ -777,21 +777,21 @@ export const SeatingBoxView: React.FC = () => {
 
                                     {/* Strike for Cause from within Jury Pool */}
                                     {!isStruck && (
-                                      <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                                        <Tooltip
-                                          content="Strike for Cause (Granted)"
-                                          side="top"
-                                          align="right"
-                                        >
+                                      <div className="absolute -top-2.5 -left-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
+                                        <Tooltip content="Struck for Cause" side="top" align="left">
                                           <button
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              recordCauseChallenge(juror.id, juror.strikeIntentNote || 'Excused for cause by court', 'granted');
+                                              recordCauseChallenge(
+                                                juror.id,
+                                                juror.strikeIntentNote || 'Excused for cause by court',
+                                                'granted'
+                                              );
                                             }}
                                             className="bg-amber-950 hover:bg-amber-800 border border-amber-600 text-amber-200 rounded-full p-1 shadow transition-colors"
-                                            title="Strike for Cause (Granted)"
+                                            title="Struck for Cause"
                                           >
-                                            <ShieldAlert className="w-3 h-3 text-amber-300" />
+                                            <ShieldAlert className="w-3.5 h-3.5 text-amber-300" />
                                           </button>
                                         </Tooltip>
                                       </div>

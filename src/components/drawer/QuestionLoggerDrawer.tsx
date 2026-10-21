@@ -66,7 +66,7 @@ export const QuestionLoggerDrawer: React.FC = () => {
 
   return (
     <div className="bg-amber-950/70 border-b border-amber-500/40 text-amber-100 px-4 py-2.5 shadow-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative z-20 backdrop-blur-md">
-      {/* Left: Active Question Indicator & Instruction */}
+      {/* Left: Active Question Indicator & Instruction
       <div className="flex items-center space-x-3">
         <div className="p-2 bg-amber-500 text-slate-950 rounded-xl font-bold flex items-center justify-center shadow-md animate-pulse">
           <Hand className="w-5 h-5" />
@@ -84,11 +84,11 @@ export const QuestionLoggerDrawer: React.FC = () => {
             {currentQuestion ? currentQuestion.text : 'Select or type a question to log hand-raises...'}
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Center: Instruction badge */}
       <div className="hidden lg:flex items-center space-x-1.5 px-3 py-1 bg-amber-900/40 border border-amber-700/50 rounded-lg text-xs text-amber-200">
-        <span>👉 Tap any juror card in the seating chart or grid to toggle hand raised!</span>
+        <span>Tap jurors to toggle raised hands</span>
       </div>
 
       {/* Right: Question Switcher & Controls */}
@@ -103,7 +103,7 @@ export const QuestionLoggerDrawer: React.FC = () => {
                 setActiveQuestionId(e.target.value);
               }
             }}
-            className="bg-slate-900 border border-amber-700/60 rounded-lg px-2.5 py-1.5 text-xs text-amber-100 outline-none max-w-[200px] truncate"
+            className="bg-slate-900 border border-amber-700/60 rounded-lg px-2.5 py-1.5 text-xs text-amber-100 outline-none max-w-[60rem] truncate"
           >
             {questions.map((q, idx) => (
               <option key={q.id} value={q.id}>
