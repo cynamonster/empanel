@@ -70,7 +70,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Scale className="w-5 h-5 text-indigo-400" />
           </div>
           <span className="hidden sm:inline bg-gradient-to-r from-indigo-300 to-indigo-100 bg-clip-text text-transparent">
-            VOIR DIRE
+            EMPANEL
           </span>
         </div>
 

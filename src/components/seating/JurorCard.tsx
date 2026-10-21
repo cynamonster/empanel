@@ -51,11 +51,11 @@ export const JurorCard: React.FC<JurorCardProps> = ({
         </span>
       );
     }
-    return (
-      <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
-        0
-      </span>
-    );
+    // return (
+    //   <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
+    //     0
+    //   </span>
+    // );
   };
 
   const getStatusBadge = () => {
@@ -85,12 +85,12 @@ export const JurorCard: React.FC<JurorCardProps> = ({
             CAUSE DENIED
           </span>
         );
-      case 'alternate':
-        return (
-          <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-purple-900/60 text-purple-300 border border-purple-700">
-            ALT
-          </span>
-        );
+      // case 'alternate':
+      //   return (
+      //     <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-purple-900/60 text-purple-300 border border-purple-700">
+      //       ALT
+      //     </span>
+      //   );
       default:
         if (juror.strikeIntent === 'strike_peremptory') {
           return (
@@ -181,16 +181,15 @@ export const JurorCard: React.FC<JurorCardProps> = ({
       {!compact && (
         <div className="mt-1 space-y-0.5 text-xs text-slate-400">
           <div className="truncate flex items-center space-x-1">
-            <span className="text-slate-500">Occ:</span>
-            <span className="text-slate-300 truncate">{juror.occupation || '—'}</span>
+            <span className="text-slate-300 truncate">{juror.occupation || ''}</span>
           </div>
           <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
             <span>
               {juror.age ? `${juror.age}y` : ''}{juror.age && juror.gender ? ' • ' : ''}{juror.gender || ''}
             </span>
-            <span className="truncate max-w-[120px] text-slate-500 text-right">
+            {/* <span className="truncate max-w-[120px] text-slate-500 text-right">
               {juror.cityState || juror.cityOrZip || ''}
-            </span>
+            </span> */}
           </div>
         </div>
       )}

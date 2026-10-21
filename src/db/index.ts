@@ -26,9 +26,9 @@ export async function createDefaultCase(type: 'civil' | 'criminal' = 'criminal')
   const isCriminal = type === 'criminal';
   const newCase: Case = {
     id: `case-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    name: isCriminal ? 'New Criminal Trial (3 Strikes)' : 'New Civil Trial (3 Strikes)',
+    name: isCriminal ? 'New Criminal Trial' : 'New Civil Trial',
     caseType: type,
-    ourSide: 'defense',
+    ourSide: 'plaintiff_prosecution',
     plaintiffStrikesAllowed: 3,
     defenseStrikesAllowed: 3,
     alternateStrikesAllowed: 1,
