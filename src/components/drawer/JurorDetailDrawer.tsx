@@ -404,11 +404,11 @@ export const JurorDetailDrawer: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <div className="hidden sm:flex items-center space-x-1 font-mono text-[10px] text-slate-400 bg-slate-950/80 px-1.5 py-0.5 rounded border border-slate-800" title="Cycle Jurors: ` next, ~ prev">
+          {/* <div className="hidden sm:flex items-center space-x-1 font-mono text-[10px] text-slate-400 bg-slate-950/80 px-1.5 py-0.5 rounded border border-slate-800" title="Cycle Jurors: ` next, ~ prev">
             <span>` next</span>
             <span>•</span>
             <span>~ prev</span>
-          </div>
+          </div> */}
           <button
             onClick={() => {
               flushUpdates();
@@ -445,7 +445,7 @@ export const JurorDetailDrawer: React.FC = () => {
               Favorability Rating
             </label>
             <span className="text-[10px] text-slate-500 font-mono">
-              Keys: 1–3, Shift+1–3, 0
+              Keyboard: 1–3, Shift 1–3, 0
             </span>
           </div>
           <div className="grid grid-cols-7 gap-1 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
@@ -666,7 +666,7 @@ export const JurorDetailDrawer: React.FC = () => {
                 value={juror.age || ''}
                 onChange={e => updateJuror(juror.id, { age: e.target.value })}
                 placeholder="e.g. 42"
-                className="w-full bg-slate-900 border border-slate-850 rounded px-2 py-1 text-slate-200 text-xs"
+                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
               />
             </div>
             <div>
@@ -676,7 +676,7 @@ export const JurorDetailDrawer: React.FC = () => {
                 value={juror.gender || ''}
                 onChange={e => updateJuror(juror.id, { gender: e.target.value })}
                 placeholder="e.g. F / M"
-                className="w-full bg-slate-900 border border-slate-850 rounded px-2 py-1 text-slate-200 text-xs"
+                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
               />
             </div>
             <div>
@@ -686,7 +686,7 @@ export const JurorDetailDrawer: React.FC = () => {
                 value={juror.raceEthnicity || ''}
                 onChange={e => updateJuror(juror.id, { raceEthnicity: e.target.value })}
                 placeholder="e.g. Caucasian / Hispanic"
-                className="w-full bg-slate-900 border border-slate-850 rounded px-2 py-1 text-slate-200 text-xs"
+                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
               />
             </div>
             <div>
@@ -696,7 +696,7 @@ export const JurorDetailDrawer: React.FC = () => {
                 value={juror.cityState || juror.cityOrZip || ''}
                 onChange={e => updateJuror(juror.id, { cityState: e.target.value })}
                 placeholder="e.g. Austin, TX"
-                className="w-full bg-slate-900 border border-slate-850 rounded px-2 py-1 text-slate-200 text-xs"
+                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
               />
             </div>
             <div className="col-span-2">
@@ -706,7 +706,7 @@ export const JurorDetailDrawer: React.FC = () => {
                 value={juror.occupation || ''}
                 onChange={e => updateJuror(juror.id, { occupation: e.target.value })}
                 placeholder="e.g. Mechanical Engineer"
-                className="w-full bg-slate-900 border border-slate-850 rounded px-2 py-1 text-slate-200 text-xs"
+                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
               />
             </div>
             <div className="col-span-2">
@@ -716,7 +716,7 @@ export const JurorDetailDrawer: React.FC = () => {
                 value={juror.employer || ''}
                 onChange={e => updateJuror(juror.id, { employer: e.target.value })}
                 placeholder="e.g. Dell Technologies"
-                className="w-full bg-slate-900 border border-slate-850 rounded px-2 py-1 text-slate-200 text-xs"
+                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
               />
             </div>
           </div>
