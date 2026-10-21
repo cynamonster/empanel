@@ -171,7 +171,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
                   {fileName ? fileName : 'Choose CSV/TSV File or Drag & Drop'}
                 </div>
                 <div className="text-xs text-slate-500 mt-1">
-                  Supports court-provided rosters (Juror #, Name, Occupation, Age, City/Zip)
+                  Supports court-provided rosters (Juror #, Name, Occupation, Age, City/State)
                 </div>
               </div>
             </div>
@@ -184,7 +184,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
               </p>
               <textarea
                 rows={5}
-                placeholder={"1\tJane Doe\tAccountant\t45\tAustin\n2\tJohn Smith\tElectrician\t38\tRound Rock"}
+                placeholder={"1\tJane Doe\tAccountant\t45\tAustin, TX\n2\tJohn Smith\tElectrician\t38\tRound Rock, TX"}
                 value={rawText}
                 onChange={e => setRawText(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 font-mono outline-none focus:border-indigo-500 resize-none"
