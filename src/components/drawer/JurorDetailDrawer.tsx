@@ -19,6 +19,45 @@ import {
 } from 'lucide-react';
 import type { Juror } from '../../types';
 
+function getOrderedJurors(jurors: Juror[], activeCase: any, currentJuror: Juror | null | undefined): Juror[] {
+  if (!activeCase || jurors.length === 0) return jurors;
+
+  // 1. Check if currentJuror is seated on panel or alternates
+  const isCurrentlySeated = currentJuror?.seatNumber !== undefined;
+
+  // Seated panel jurors (seats 1..boxSize)
+  const panelJurors = jurors
+    .filter(j => j.seatNumber !== undefined && !j.isAlternate && !j.status.startsWith('struck_') && j.status !== 'cause_granted')
+    .sort((a, b) => (a.seatNumber || 0) - (b.seatNumber || 0));
+
+  // Seated alternate jurors (seats 1..alternateCount)
+  const altJurors = jurors
+    .filter(j => j.seatNumber !== undefined && j.isAlternate && !j.status.startsWith('struck_') && j.status !== 'cause_granted')
+    .sort((a, b) => (a.seatNumber || 0) - (b.seatNumber || 0));
+
+  const allSeated = [...panelJurors, ...altJurors];
+
+  // If currently seated and there are seated jurors, cycle through panel + alternates
+  if (isCurrentlySeated && allSeated.length > 0) {
+    return allSeated;
+  }
+
+  // Otherwise, sort all jurors by gallery order or jurorNumber
+  return [...jurors].sort((a, b) => {
+    if (activeCase.galleryOrder && activeCase.galleryOrder.length > 0) {
+      const idxA = activeCase.galleryOrder.indexOf(a.id);
+      const idxB = activeCase.galleryOrder.indexOf(b.id);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+    }
+    const numA = parseInt(a.jurorNumber, 10);
+    const numB = parseInt(b.jurorNumber, 10);
+    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+    return a.jurorNumber.localeCompare(b.jurorNumber);
+  });
+}
+
 export const JurorDetailDrawer: React.FC = () => {
   const {
     jurors,
@@ -34,6 +73,8 @@ export const JurorDetailDrawer: React.FC = () => {
     activeCase,
     assignSeat,
     unseatJuror,
+    activeQuestionId,
+    setActiveQuestionId,
   } = useCase();
 
   const [showCauseModal, setShowCauseModal] = useState(false);
@@ -43,6 +84,7 @@ export const JurorDetailDrawer: React.FC = () => {
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const strikeNoteRef = useRef<HTMLTextAreaElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
+  const pendingFocusFieldRef = useRef<'notes' | 'strikeIntentNote' | null>(null);
 
   const currentJuror = jurors.find(j => j.id === selectedJurorId);
   const lastJurorRef = useRef<Juror | null>(null);
@@ -90,7 +132,7 @@ export const JurorDetailDrawer: React.FC = () => {
       setLocalStrikeNote(juror.strikeIntentNote || '');
     }
 
-    // Auto-fit height when switching juror
+    // Auto-fit height when switching juror & retain focus if navigated via backtick
     requestAnimationFrame(() => {
       if (notesRef.current) {
         notesRef.current.style.height = 'auto';
@@ -99,6 +141,16 @@ export const JurorDetailDrawer: React.FC = () => {
       if (strikeNoteRef.current) {
         strikeNoteRef.current.style.height = 'auto';
         strikeNoteRef.current.style.height = `${Math.max(52, strikeNoteRef.current.scrollHeight)}px`;
+      }
+
+      if (pendingFocusFieldRef.current === 'notes' && notesRef.current) {
+        notesRef.current.focus();
+        const len = notesRef.current.value.length;
+        notesRef.current.setSelectionRange(len, len);
+      } else if (pendingFocusFieldRef.current === 'strikeIntentNote' && strikeNoteRef.current) {
+        strikeNoteRef.current.focus();
+        const len = strikeNoteRef.current.value.length;
+        strikeNoteRef.current.setSelectionRange(len, len);
       }
     });
   }, [juror?.id]);
@@ -109,12 +161,117 @@ export const JurorDetailDrawer: React.FC = () => {
     };
   }, []);
 
-  // Close sidebar on ESCAPE key or tap-away outside
+  // Keyboard Shortcuts: Sequential Juror Cycling (` / ~), Ratings (1-3, Shift+1-3, 0), and Question Logger (q)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && selectedJurorId) {
+      const activeEl = document.activeElement as HTMLElement | null;
+      const isInput = activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement || (activeEl as HTMLElement)?.isContentEditable;
+      const isModalOpen = Boolean(document.querySelector('.fixed.inset-0.z-50'));
+
+      // 1. ESCAPE KEY: Close drawer (if no modal is open)
+      if (e.key === 'Escape') {
+        if (!isModalOpen && selectedJurorId) {
+          flushUpdates();
+          setSelectedJurorId(null);
+          pendingFocusFieldRef.current = null;
+        }
+        return;
+      }
+
+      // If a modal is open, do not execute global shortcuts
+      if (isModalOpen) return;
+
+      // 2. BACKTICK (`) / TILDE (~): Sequential Juror Cycling (NO INPUT ISOLATION)
+      // Listened for even while inside text inputs / textareas to allow seamless rapid note-taking!
+      if ((e.code === 'Backquote' || e.key === '`' || e.key === '~') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Remember which field had focus so we keep focus for the new juror
+        if (activeEl?.getAttribute('data-field') === 'notes') {
+          pendingFocusFieldRef.current = 'notes';
+        } else if (activeEl?.getAttribute('data-field') === 'strikeIntentNote') {
+          pendingFocusFieldRef.current = 'strikeIntentNote';
+        } else {
+          pendingFocusFieldRef.current = null;
+        }
+
+        // Flush any pending text changes for current juror before moving
         flushUpdates();
-        setSelectedJurorId(null);
+
+        const ordered = getOrderedJurors(jurors, activeCase, currentJuror);
+        if (ordered.length === 0) return;
+
+        let nextIdx = 0;
+        if (selectedJurorId) {
+          const currIdx = ordered.findIndex(j => j.id === selectedJurorId);
+          if (currIdx !== -1) {
+            nextIdx = e.shiftKey
+              ? (currIdx - 1 + ordered.length) % ordered.length
+              : (currIdx + 1) % ordered.length;
+          }
+        }
+
+        const nextJuror = ordered[nextIdx];
+        if (nextJuror) {
+          setSelectedJurorId(nextJuror.id);
+        }
+        return;
+      }
+
+      // ALL SHORTCUTS BELOW REQUIRE INPUT ISOLATION (Do not fire if user is typing in a field)
+      if (isInput) return;
+
+      // 3. TACTILE RATINGS: 1, 2, 3 (Favorable) and Shift+1, 2, 3 (Negative), 0 (Neutral)
+      if (selectedJurorId && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (e.key === '1' && !e.shiftKey) {
+          e.preventDefault();
+          updateJuror(selectedJurorId, { rating: 1 });
+          return;
+        }
+        if (e.key === '2' && !e.shiftKey) {
+          e.preventDefault();
+          updateJuror(selectedJurorId, { rating: 2 });
+          return;
+        }
+        if (e.key === '3' && !e.shiftKey) {
+          e.preventDefault();
+          updateJuror(selectedJurorId, { rating: 3 });
+          return;
+        }
+        if (e.key === '!' || (e.key === '1' && e.shiftKey)) {
+          e.preventDefault();
+          updateJuror(selectedJurorId, { rating: -1 });
+          return;
+        }
+        if (e.key === '@' || (e.key === '2' && e.shiftKey)) {
+          e.preventDefault();
+          updateJuror(selectedJurorId, { rating: -2 });
+          return;
+        }
+        if (e.key === '#' || (e.key === '3' && e.shiftKey)) {
+          e.preventDefault();
+          updateJuror(selectedJurorId, { rating: -3 });
+          return;
+        }
+        if (e.key === '0') {
+          e.preventDefault();
+          updateJuror(selectedJurorId, { rating: 0 });
+          return;
+        }
+      }
+
+      // 4. QUESTION LOGGER TOGGLE: 'q' / 'Q'
+      if ((e.key === 'q' || e.key === 'Q') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        if (activeQuestionId) {
+          setActiveQuestionId(null);
+        } else if (questions.length > 0) {
+          setActiveQuestionId(questions[0].id);
+        } else {
+          setActiveQuestionId('new');
+        }
+        return;
       }
     };
 
@@ -128,6 +285,7 @@ export const JurorDetailDrawer: React.FC = () => {
         }
         flushUpdates();
         setSelectedJurorId(null);
+        pendingFocusFieldRef.current = null;
       }
     };
 
@@ -140,7 +298,7 @@ export const JurorDetailDrawer: React.FC = () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [selectedJurorId, setSelectedJurorId]);
+  }, [selectedJurorId, setSelectedJurorId, jurors, activeCase, currentJuror, updateJuror, activeQuestionId, setActiveQuestionId, questions]);
 
   if (!juror) {
     return (
@@ -245,15 +403,23 @@ export const JurorDetailDrawer: React.FC = () => {
             </div>
           </div>
         </div>
-        <button
-          onClick={() => {
-            flushUpdates();
-            setSelectedJurorId(null);
-          }}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center space-x-2">
+          <div className="hidden sm:flex items-center space-x-1 font-mono text-[10px] text-slate-400 bg-slate-950/80 px-1.5 py-0.5 rounded border border-slate-800" title="Cycle Jurors: ` next, ~ prev">
+            <span>` next</span>
+            <span>•</span>
+            <span>~ prev</span>
+          </div>
+          <button
+            onClick={() => {
+              flushUpdates();
+              setSelectedJurorId(null);
+            }}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            title="Close Drawer (Esc)"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Drawer Body */}
@@ -274,9 +440,14 @@ export const JurorDetailDrawer: React.FC = () => {
 
         {/* SECTION: TACTICAL RATING */}
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
-            Favorability Rating
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Favorability Rating
+            </label>
+            <span className="text-[10px] text-slate-500 font-mono">
+              Keys: 1–3, Shift+1–3, 0
+            </span>
+          </div>
           <div className="grid grid-cols-7 gap-1 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
             {ratings.map(val => {
               const isSelected = juror.rating === val;
@@ -369,6 +540,7 @@ export const JurorDetailDrawer: React.FC = () => {
             </span>
             <textarea
               ref={strikeNoteRef}
+              data-field="strikeIntentNote"
               rows={2}
               value={localStrikeNote}
               onChange={handleStrikeNoteChange}
@@ -461,11 +633,17 @@ export const JurorDetailDrawer: React.FC = () => {
 
         {/* SECTION: RAPID NOTES */}
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-            Notes
-          </label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Notes
+            </label>
+            <span className="text-[10px] text-slate-500 font-mono">
+              ` next • ~ prev
+            </span>
+          </div>
           <textarea
             ref={notesRef}
+            data-field="notes"
             rows={3}
             placeholder="Type notes during questioning, demeanor observations, quotes..."
             value={localNotes}

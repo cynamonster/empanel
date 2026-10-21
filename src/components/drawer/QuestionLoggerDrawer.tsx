@@ -20,18 +20,35 @@ export const QuestionLoggerDrawer: React.FC = () => {
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [editText, setEditText] = useState('');
 
-  // Close modals or exit logger on Escape key
+  // Close modals or exit logger on Escape key, or press 'n' for new question
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput = activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement || (activeEl as HTMLElement)?.isContentEditable;
+
       if (e.key === 'Escape') {
-        if (showAddForm) setShowAddForm(false);
-        else if (editingQuestion) setEditingQuestion(null);
-        else setActiveQuestionId(null);
+        if (showAddForm) {
+          setShowAddForm(false);
+          if (activeQuestionId === 'new') setActiveQuestionId(null);
+        } else if (editingQuestion) {
+          setEditingQuestion(null);
+        } else {
+          setActiveQuestionId(null);
+        }
+      } else if ((e.key === 'n' || e.key === 'N') && !isInput && !showAddForm && !editingQuestion && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        setShowAddForm(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showAddForm, editingQuestion, setActiveQuestionId]);
+  }, [showAddForm, editingQuestion, activeQuestionId, setActiveQuestionId]);
+
+  useEffect(() => {
+    if (activeQuestionId === 'new') {
+      setShowAddForm(true);
+    }
+  }, [activeQuestionId]);
 
   if (!activeQuestionId) return null;
 
@@ -87,8 +104,9 @@ export const QuestionLoggerDrawer: React.FC = () => {
       </div> */}
 
       {/* Center: Instruction badge */}
-      <div className="hidden lg:flex items-center space-x-1.5 px-3 py-1 bg-amber-900/40 border border-amber-700/50 rounded-lg text-xs text-amber-200">
+      <div className="hidden lg:flex items-center space-x-2 px-3 py-1 bg-amber-900/40 border border-amber-700/50 rounded-lg text-xs text-amber-200">
         <span>Tap jurors to toggle raised hands</span>
+        <span className="text-amber-400/60 font-mono text-[11px]">• 'n' new question • 'q' exit</span>
       </div>
 
       {/* Right: Question Switcher & Controls */}
@@ -140,9 +158,11 @@ export const QuestionLoggerDrawer: React.FC = () => {
         <button
           onClick={() => setShowAddForm(true)}
           className="flex items-center space-x-1 px-2.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-lg text-xs transition-colors"
+          title="Add New Question (Press 'n')"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>New Question</span>
+          <span className="hidden sm:inline opacity-75 font-mono text-[10px] ml-0.5 font-normal bg-amber-700/60 px-1 rounded text-white">N</span>
         </button>
 
         <button

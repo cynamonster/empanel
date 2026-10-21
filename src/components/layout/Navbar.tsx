@@ -207,11 +207,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 ring-2 ring-amber-500/30 animate-pulse'
               : 'bg-slate-800 hover:bg-slate-750 border-slate-700 text-slate-300'
           }`}
-          title="Toggle Group Question Hand-Raise Logger"
+          title="Toggle Group Question Hand-Raise Logger (Press 'q')"
         >
           <Hand className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">
             {activeQuestionId ? 'Logging Active' : 'Question Logger'}
+          </span>
+          <span className="hidden md:inline font-mono text-[10px] opacity-60 bg-slate-700/80 px-1 py-0.2 rounded text-slate-300">
+            Q
           </span>
         </button>
 
