@@ -653,38 +653,6 @@ export const JurorDetailDrawer: React.FC = () => {
           />
         </div>
 
-        {/* SECTION: GROUP QUESTION RESPONSES */}
-        {questions.length > 0 && (
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-              Group Question Hand-Raises
-            </label>
-            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-              {questions.map(q => {
-                const raised = juror.responses?.[q.id]?.answeredYes;
-                return (
-                  <div
-                    key={q.id}
-                    onClick={() => toggleJurorResponse(juror.id, q.id)}
-                    className={`p-2 rounded-lg border text-xs flex items-center justify-between cursor-pointer transition-colors ${
-                      raised
-                        ? 'bg-amber-950/40 border-amber-500/50 text-amber-200'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <span className="truncate pr-2">{q.text}</span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      raised ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-500'
-                    }`}>
-                      {raised ? 'YES' : 'NO'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* SECTION: DEMOGRAPHICS & PROFILE */}
         <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800 space-y-2">
           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
@@ -753,6 +721,38 @@ export const JurorDetailDrawer: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* SECTION: GROUP QUESTION RESPONSES */}
+        {questions.length > 0 && (
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+              Group Question Hand-Raises
+            </label>
+            <div className="space-y-1.5">
+              {questions.map(q => {
+                const raised = juror.responses?.[q.id]?.answeredYes;
+                return (
+                  <div
+                    key={q.id}
+                    onClick={() => toggleJurorResponse(juror.id, q.id)}
+                    className={`p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+                      raised
+                        ? 'bg-amber-950/40 border-amber-500/50 text-amber-200'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                    }`}
+                  >
+                    <span className="leading-snug break-words flex-1">{q.text}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ${
+                      raised ? 'bg-amber-500 text-slate-950 font-black shadow-sm' : 'bg-slate-800 text-slate-500'
+                    }`}>
+                      {raised ? 'YES' : 'NO'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Delete Juror */}
         <div className="pt-2 border-t border-slate-800">

@@ -185,7 +185,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
               <span className="text-slate-600">|</span>
               <span className="text-blue-400 font-mono font-medium" title="Defense Remaining">
-                D: {dRemaining}/{activeCase?.defenseStrikesAllowed || 3}
+                Def: {dRemaining}/{activeCase?.defenseStrikesAllowed || 3}
               </span>
             </div>
           </button>

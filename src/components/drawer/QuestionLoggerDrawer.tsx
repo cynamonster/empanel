@@ -121,7 +121,7 @@ export const QuestionLoggerDrawer: React.FC = () => {
                 setActiveQuestionId(e.target.value);
               }
             }}
-            className="bg-slate-900 border border-amber-700/60 rounded-lg px-2.5 py-1.5 text-xs text-amber-100 outline-none max-w-[60rem] truncate"
+            className="bg-slate-900 border border-amber-700/60 rounded-lg px-2.5 py-1.5 text-xs text-amber-100 outline-none max-w-[45rem] truncate"
           >
             {questions.map((q, idx) => (
               <option key={q.id} value={q.id}>
@@ -165,13 +165,13 @@ export const QuestionLoggerDrawer: React.FC = () => {
           <span className="hidden sm:inline opacity-75 font-mono text-[10px] ml-0.5 font-normal bg-amber-700/60 px-1 rounded text-white">N</span>
         </button>
 
-        <button
+        {/* <button
           onClick={() => setActiveQuestionId(null)}
           className="p-1.5 bg-slate-900/80 hover:bg-slate-800 border border-amber-700/50 rounded-lg text-amber-300 hover:text-white transition-colors"
           title="Exit Question Logger Mode (Esc)"
         >
           <X className="w-4 h-4" />
-        </button>
+        </button> */}
       </div>
 
       {/* Edit Question Modal */}
