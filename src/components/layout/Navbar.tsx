@@ -168,11 +168,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Live Strike Tally Badge */}
-        <Tooltip content="Open Strategic Strike Console" side="bottom">
+        {/* <Tooltip content="Open Strategic Strike Console" side="bottom"> */}
           <button
-            onClick={onOpenStrikeConsole}
+            // onClick={onOpenStrikeConsole}
             className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-xs transition-colors"
-            title="Open Strategic Strike Console"
+            // title="Open Strategic Strike Console"
+            style={{ cursor: 'default' }}
           >
             <Gavel className="w-3.5 h-3.5 text-amber-400" />
             <div className="flex items-center space-x-2">
@@ -189,7 +190,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </div>
           </button>
-        </Tooltip>
+        {/* </Tooltip> */}
 
         {/* Group Question Mode Toggle */}
         <button

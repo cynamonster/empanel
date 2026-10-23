@@ -334,10 +334,12 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!juror) return;
     
     const existing = juror.responses?.[questionId]?.answeredYes;
+    const existingNote = juror.responses?.[questionId]?.note;
     const newResponses = {
       ...(juror.responses || {}),
       [questionId]: {
         answeredYes: !existing,
+        note: existingNote,
       }
     };
     

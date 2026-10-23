@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { Juror } from '../../types';
 import { useCase } from '../../context/CaseContext';
-import { Hand, User, ShieldAlert, Award, AlertCircle } from 'lucide-react';
+import { Hand, User, ShieldAlert, Award, AlertCircle, MessageSquareText } from 'lucide-react';
 
 interface JurorCardProps {
   juror: Juror;
@@ -31,10 +31,104 @@ export const JurorCard: React.FC<JurorCardProps> = ({
     setSelectedJurorId,
     activeQuestionId,
     toggleJurorResponse,
+    updateJuror,
   } = useCase();
 
+  const [isHovered, setIsHovered] = useState(false);
+  const [isBadgeHovered, setIsBadgeHovered] = useState(false);
+  const [isInputOpen, setIsInputOpen] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const currentResponse = activeQuestionId ? juror.responses?.[activeQuestionId] : undefined;
+  const isHandRaised = !!currentResponse?.answeredYes;
+  const currentQuestionNote = currentResponse?.note || '';
+  const [noteText, setNoteText] = useState(currentQuestionNote);
+
+  // Sync noteText when activeQuestionId or response changes and not currently typing
+  useEffect(() => {
+    if (!isInputOpen) {
+      setNoteText(currentQuestionNote);
+    }
+  }, [currentQuestionNote, isInputOpen, activeQuestionId]);
+
+  // Focus input and move cursor to end when input is opened
+  useEffect(() => {
+    if (isInputOpen && inputRef.current) {
+      inputRef.current.focus();
+      const len = inputRef.current.value.length;
+      inputRef.current.setSelectionRange(len, len);
+    }
+  }, [isInputOpen]);
+
+  const saveNote = () => {
+    if (!activeQuestionId) return;
+    const trimmed = noteText.trim();
+    if (trimmed === (currentResponse?.note || '')) return;
+
+    const newResponses = {
+      ...(juror.responses || {}),
+      [activeQuestionId]: {
+        answeredYes: currentResponse ? currentResponse.answeredYes : true,
+        note: trimmed || undefined,
+      },
+    };
+    updateJuror(juror.id, { responses: newResponses });
+  };
+
+  const handleCardMouseLeave = (e: React.MouseEvent) => {
+    setIsHovered(false);
+    setIsBadgeHovered(false);
+    const related = e.relatedTarget as Node | null;
+    if (inputContainerRef.current && related && inputContainerRef.current.contains(related)) {
+      return;
+    }
+    if (isInputOpen) {
+      saveNote();
+      setIsInputOpen(false);
+    }
+  };
+
+  const handleInputContainerMouseLeave = (e: React.MouseEvent) => {
+    const related = e.relatedTarget as Node | null;
+    if (cardRef.current && related && cardRef.current.contains(related)) {
+      return;
+    }
+    if (isInputOpen) {
+      saveNote();
+      setIsInputOpen(false);
+    }
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      saveNote();
+      setIsInputOpen(false);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsInputOpen(false);
+      setNoteText(currentQuestionNote);
+    }
+  };
+
+  const handleIconClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!activeQuestionId) return;
+    if (!isHandRaised) {
+      toggleJurorResponse(juror.id, activeQuestionId);
+    }
+    if (selectedJurorId) {
+      setSelectedJurorId(juror.id);
+    }
+    setIsInputOpen(true);
+    setIsBadgeHovered(false);
+  };
+
   const isSelected = selectedJurorId === juror.id;
-  const isHandRaised = activeQuestionId && juror.responses?.[activeQuestionId]?.answeredYes;
 
   const getRatingBadge = (rating: number) => {
     if (rating > 0) {
@@ -120,6 +214,11 @@ export const JurorCard: React.FC<JurorCardProps> = ({
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isInputOpen) {
+      saveNote();
+      setIsInputOpen(false);
+      return;
+    }
     if (activeQuestionId) {
       toggleJurorResponse(juror.id, activeQuestionId);
       if (selectedJurorId) {
@@ -132,12 +231,15 @@ export const JurorCard: React.FC<JurorCardProps> = ({
 
   return (
     <div
+      ref={cardRef}
       data-juror-card={juror.id}
       draggable={isDraggable && !activeQuestionId}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
       onClick={handleClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={handleCardMouseLeave}
       className={`relative group rounded-xl p-2.5 select-none transition-all duration-300 ease-out transform ${
         isDraggable ? 'cursor-grab active:cursor-grabbing hover:scale-[1.01]' : 'cursor-pointer'
       } ${
@@ -214,18 +316,63 @@ export const JurorCard: React.FC<JurorCardProps> = ({
         </div>
       )}
 
-      {/* Active Question Logger Indicator (Floating Hand) */}
+      {/* Active Question Logger Indicator & Expanding Note Input */}
       {activeQuestionId && (
-        <div
-          className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center border shadow transition-all ${
-            isHandRaised
-              ? 'bg-amber-500 border-amber-300 text-slate-950 scale-110 shadow-amber-500/50'
-              : 'bg-slate-800 border-slate-600 text-slate-500 hover:text-amber-300 hover:border-amber-500'
-          }`}
-          title={isHandRaised ? 'Hand Raised (Tap to toggle)' : 'Tap to mark Hand Raised'}
-        >
-          <Hand className="w-3.5 h-3.5" />
-        </div>
+        <>
+          {isInputOpen ? (
+            <div
+              ref={inputContainerRef}
+              onClick={e => e.stopPropagation()}
+              onMouseLeave={handleInputContainerMouseLeave}
+              className="absolute inset-x-1 -top-3 z-40 bg-slate-900 border border-amber-400 rounded-xl p-1.5 shadow-2xl flex items-center space-x-1.5 ring-2 ring-amber-400/40"
+            >
+              <MessageSquareText className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 ml-1" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={noteText}
+                onChange={e => setNoteText(e.target.value)}
+                onKeyDown={handleInputKeyDown}
+                placeholder="Note on hand raise..."
+                className="flex-1 min-w-0 bg-slate-950 border border-slate-700 focus:border-amber-400 rounded px-2 py-0.5 text-xs text-slate-100 placeholder-slate-500 outline-none"
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleIconClick}
+              onMouseEnter={() => setIsBadgeHovered(true)}
+              onMouseLeave={() => setIsBadgeHovered(false)}
+              className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center border transition-all duration-200 z-20 hover:bg-amber-800 hover:border-amber-700 hover:text-amber-100 hover:shadow-inner hover:ring-0 ${
+                isBadgeHovered
+                  ? 'bg-amber-800 border-amber-700 text-amber-100 scale-110 shadow-inner ring-0'
+                  : isHovered
+                  ? 'bg-amber-400 border-amber-200 text-slate-950 scale-110 shadow-[0_0_15px_rgba(251,191,36,0.95)] ring-2 ring-amber-300/80'
+                  : isHandRaised
+                  ? 'bg-amber-500 border-amber-300 text-slate-950 scale-110 shadow-md shadow-amber-500/40'
+                  : 'bg-slate-800 border-slate-600 text-slate-500 shadow-none'
+              }`}
+              title={
+                currentQuestionNote
+                  ? `Note: "${currentQuestionNote}" (Click to edit)`
+                  : isHovered
+                  ? 'Click to add note to hand raise'
+                  : isHandRaised
+                  ? 'Hand Raised (Click to add note)'
+                  : 'Tap to mark Hand Raised'
+              }
+            >
+              {isHovered ? (
+                <MessageSquareText className="w-3.5 h-3.5" />
+              ) : (
+                <Hand className="w-3.5 h-3.5" />
+              )}
+              {!isHovered && currentQuestionNote && (
+                <span className="absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full bg-blue-400 border border-slate-900 shadow-sm" />
+              )}
+            </button>
+          )}
+        </>
       )}
     </div>
   );

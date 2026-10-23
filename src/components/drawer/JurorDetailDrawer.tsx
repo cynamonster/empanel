@@ -15,7 +15,8 @@ import {
   MapPin,
   Briefcase,
   GraduationCap,
-  FileEdit
+  FileEdit,
+  MessageSquare
 } from 'lucide-react';
 import type { Juror } from '../../types';
 
@@ -666,7 +667,9 @@ export const JurorDetailDrawer: React.FC = () => {
             </label>
             <div className="space-y-1.5">
               {questions.map(q => {
-                const raised = juror.responses?.[q.id]?.answeredYes;
+                const resp = juror.responses?.[q.id];
+                const raised = resp?.answeredYes;
+                const note = resp?.note;
                 return (
                   <div
                     key={q.id}
@@ -677,7 +680,27 @@ export const JurorDetailDrawer: React.FC = () => {
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
                     }`}
                   >
-                    <span className="leading-snug break-words flex-1">{q.text}</span>
+                    <div className="flex items-center space-x-2 leading-snug break-words flex-1 min-w-0">
+                      <span className="flex-1">{q.text}</span>
+                      {raised && note && (
+                        <div
+                          className="relative group/note flex-shrink-0"
+                          title={note}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <div className="p-1 rounded bg-amber-500/20 border border-amber-400/40 text-amber-300 hover:text-white hover:bg-amber-500/40 transition-colors flex items-center space-x-1">
+                            <MessageSquare className="w-3.5 h-3.5" />
+                          </div>
+                          {/* Floating Note Tooltip on Hover */}
+                          <div className="absolute bottom-full right-0 mb-1.5 hidden group-hover/note:flex flex-col items-end z-50 pointer-events-none">
+                            <div className="bg-slate-900 text-slate-100 border border-amber-500/50 text-[11px] font-medium py-1.5 px-2.5 rounded-lg shadow-2xl max-w-xs whitespace-normal break-words text-left">
+                              {note}
+                            </div>
+                            <div className="w-2 h-2 bg-slate-900 border-r border-b border-amber-500/50 transform rotate-45 -mt-1 mr-2" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ${
                       raised ? 'bg-amber-500 text-slate-950 font-black shadow-sm' : 'bg-slate-800 text-slate-500'
                     }`}>
