@@ -122,6 +122,9 @@ export const JurorCard: React.FC<JurorCardProps> = ({
     e.stopPropagation();
     if (activeQuestionId) {
       toggleJurorResponse(juror.id, activeQuestionId);
+      if (selectedJurorId) {
+        setSelectedJurorId(juror.id);
+      }
     } else {
       setSelectedJurorId(juror.id);
     }

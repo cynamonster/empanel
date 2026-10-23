@@ -6,8 +6,8 @@ import {
   ShieldAlert,
   RotateCcw,
   Plus,
+  Minus,
   Trash2,
-  CheckCircle,
   HelpCircle,
   AlertTriangle,
   FileText,
@@ -428,6 +428,9 @@ export const JurorDetailDrawer: React.FC = () => {
         {/* SECTION: SEATING POSITION */}
         <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
           <div>
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">
+              Seating Position
+            </span>
             <div className="font-semibold text-slate-200">
               {juror.seatNumber !== undefined
                 ? juror.isAlternate
@@ -436,6 +439,34 @@ export const JurorDetailDrawer: React.FC = () => {
                 : 'Not in Jury Panel'}
             </div>
           </div>
+
+          {!isStruck && (
+            <div>
+              {juror.seatNumber === undefined ? (
+                openSeats.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => assignSeat(juror.id, openSeats[0].seatNum, openSeats[0].isAlt)}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow transition-colors flex items-center space-x-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add to Panel</span>
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-slate-500 italic">Panel Full</span>
+                )
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => unseatJuror(juror.id)}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-750 text-rose-300 border border-slate-700 hover:border-rose-800/80 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5"
+                >
+                  <Minus className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Remove from Panel</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* SECTION: TACTICAL RATING */}
@@ -566,70 +597,6 @@ export const JurorDetailDrawer: React.FC = () => {
             </div>
           ) : null}
         </div>
-
-        {/* SECTION: SEATING IN PANEL */}
-        {!isStruck && (
-          <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
-                Panel Seating
-              </span>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
-                juror.seatNumber !== undefined
-                  ? 'bg-indigo-950/80 text-indigo-300 border border-indigo-700/60'
-                  : 'bg-slate-800 text-slate-400'
-              }`}>
-                {juror.seatNumber !== undefined
-                  ? juror.isAlternate
-                    ? `Alternate #${juror.seatNumber}`
-                    : `Panel Seat #${juror.seatNumber}`
-                  : 'In Jury Pool'}
-              </span>
-            </div>
-
-            {/* If not seated, check for open seats in prospective panel */}
-            {juror.seatNumber === undefined ? (
-              openSeats.length > 0 ? (
-                <div className="space-y-1.5 pt-1">
-                  <div className="text-[11px] text-emerald-400 font-medium flex items-center space-x-1">
-                    <CheckCircle className="w-3 h-3" />
-                    <span>Open seats available in Prospective Panel:</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {openSeats.map(({ seatNum, isAlt }) => (
-                      <button
-                        key={`${isAlt ? 'alt' : 'seat'}-${seatNum}`}
-                        type="button"
-                        onClick={() => assignSeat(juror.id, seatNum, isAlt)}
-                        className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow transition-colors flex items-center space-x-1"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Seat as {isAlt ? `Alt #${seatNum}` : `Seat #${seatNum}`}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-[11px] text-slate-500 italic pt-0.5">
-                  Prospective panel is currently full ({boxSize}/{boxSize} seated).
-                </div>
-              )
-            ) : (
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[11px] text-slate-400">
-                  Assigned to {juror.isAlternate ? `Alternate #${juror.seatNumber}` : `Seat #${juror.seatNumber}`}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => unseatJuror(juror.id)}
-                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-rose-300 border border-slate-700 rounded-lg text-xs font-medium transition-colors"
-                >
-                  Return to Pool
-                </button>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* SECTION: RAPID NOTES */}
         <div>
