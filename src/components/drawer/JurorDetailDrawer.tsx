@@ -279,8 +279,18 @@ export const JurorDetailDrawer: React.FC = () => {
       if (!selectedJurorId) return;
       if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
         const target = e.target as HTMLElement;
-        // Do not close if clicking a juror card or modal
-        if (target.closest('[data-panel-card-id]') || target.closest('[data-juror-card]') || target.closest('.modal-container')) {
+        // Do not close if clicking a juror card, modal, dialog, navbar, or question logger toolbar
+        if (
+          target.closest('[data-panel-card-id]') ||
+          target.closest('[data-juror-card]') ||
+          target.closest('.modal-container') ||
+          target.closest('[role="dialog"]') ||
+          target.closest('.fixed.inset-0') ||
+          target.closest('header') ||
+          target.closest('nav') ||
+          target.closest('[data-navbar]') ||
+          target.closest('[data-question-logger]')
+        ) {
           return;
         }
         flushUpdates();
@@ -428,9 +438,6 @@ export const JurorDetailDrawer: React.FC = () => {
         {/* SECTION: SEATING POSITION */}
         <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
           <div>
-            <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">
-              Seating Position
-            </span>
             <div className="font-semibold text-slate-200">
               {juror.seatNumber !== undefined
                 ? juror.isAlternate
@@ -598,28 +605,6 @@ export const JurorDetailDrawer: React.FC = () => {
           ) : null}
         </div>
 
-        {/* SECTION: RAPID NOTES */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Notes
-            </label>
-            <span className="text-[10px] text-slate-500 font-mono">
-              ` next • ~ prev
-            </span>
-          </div>
-          <textarea
-            ref={notesRef}
-            data-field="notes"
-            rows={3}
-            placeholder="Type notes during questioning, demeanor observations, quotes..."
-            value={localNotes}
-            onChange={handleNotesChange}
-            onBlur={() => flushUpdates()}
-            className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-600 outline-none resize-none leading-relaxed overflow-hidden"
-          />
-        </div>
-
         {/* SECTION: DEMOGRAPHICS & PROFILE */}
         <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800 space-y-2">
           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
@@ -720,6 +705,25 @@ export const JurorDetailDrawer: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* SECTION: RAPID NOTES */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Notes
+            </label>
+          </div>
+          <textarea
+            ref={notesRef}
+            data-field="notes"
+            rows={3}
+            placeholder="Type notes during questioning, demeanor observations, quotes..."
+            value={localNotes}
+            onChange={handleNotesChange}
+            onBlur={() => flushUpdates()}
+            className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-600 outline-none resize-none leading-relaxed overflow-hidden"
+          />
+        </div>
 
         {/* Delete Juror */}
         <div className="pt-2 border-t border-slate-800">

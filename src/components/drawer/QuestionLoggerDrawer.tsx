@@ -82,7 +82,7 @@ export const QuestionLoggerDrawer: React.FC = () => {
   };
 
   return (
-    <div className="bg-amber-950/70 border-b border-amber-500/40 text-amber-100 px-4 py-2.5 shadow-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative z-20 backdrop-blur-md">
+    <div data-question-logger="true" className="bg-amber-950/70 border-b border-amber-500/40 text-amber-100 px-4 py-2.5 shadow-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative z-20 backdrop-blur-md">
       {/* Left: Active Question Indicator & Instruction
       <div className="flex items-center space-x-3">
         <div className="p-2 bg-amber-500 text-slate-950 rounded-xl font-bold flex items-center justify-center shadow-md animate-pulse">

@@ -62,7 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const dRemaining = Math.max(0, (activeCase?.defenseStrikesAllowed || 3) - defenseStrikesUsed);
 
   return (
-    <header className="bg-slate-900 border-b border-slate-800 text-slate-100 px-4 py-2.5 flex items-center justify-between shadow-md relative z-30">
+    <header data-navbar="true" className="bg-slate-900 border-b border-slate-800 text-slate-100 px-4 py-2.5 flex items-center justify-between shadow-md relative z-30">
       {/* Brand & Case Selector */}
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-2 text-indigo-400 font-bold tracking-tight text-lg">
