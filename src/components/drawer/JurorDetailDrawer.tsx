@@ -19,31 +19,15 @@ import {
 } from 'lucide-react';
 import type { Juror } from '../../types';
 
-function getOrderedJurors(jurors: Juror[], activeCase: any, currentJuror: Juror | null | undefined): Juror[] {
-  if (!activeCase || jurors.length === 0) return jurors;
+function getOrderedJurors(jurors: Juror[], activeCase: any): Juror[] {
+  if (!activeCase || jurors.length === 0) return [];
 
-  // 1. Check if currentJuror is seated on panel or alternates
-  const isCurrentlySeated = currentJuror?.seatNumber !== undefined;
+  // Always cycle through all unstruck jurors in the jury pool
+  const unstruck = jurors.filter(
+    j => !j.status.startsWith('struck_') && j.status !== 'cause_granted'
+  );
 
-  // Seated panel jurors (seats 1..boxSize)
-  const panelJurors = jurors
-    .filter(j => j.seatNumber !== undefined && !j.isAlternate && !j.status.startsWith('struck_') && j.status !== 'cause_granted')
-    .sort((a, b) => (a.seatNumber || 0) - (b.seatNumber || 0));
-
-  // Seated alternate jurors (seats 1..alternateCount)
-  const altJurors = jurors
-    .filter(j => j.seatNumber !== undefined && j.isAlternate && !j.status.startsWith('struck_') && j.status !== 'cause_granted')
-    .sort((a, b) => (a.seatNumber || 0) - (b.seatNumber || 0));
-
-  const allSeated = [...panelJurors, ...altJurors];
-
-  // If currently seated and there are seated jurors, cycle through panel + alternates
-  if (isCurrentlySeated && allSeated.length > 0) {
-    return allSeated;
-  }
-
-  // Otherwise, sort all jurors by gallery order or jurorNumber
-  return [...jurors].sort((a, b) => {
+  return unstruck.sort((a, b) => {
     if (activeCase.galleryOrder && activeCase.galleryOrder.length > 0) {
       const idxA = activeCase.galleryOrder.indexOf(a.id);
       const idxB = activeCase.galleryOrder.indexOf(b.id);
@@ -54,7 +38,7 @@ function getOrderedJurors(jurors: Juror[], activeCase: any, currentJuror: Juror 
     const numA = parseInt(a.jurorNumber, 10);
     const numB = parseInt(b.jurorNumber, 10);
     if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-    return a.jurorNumber.localeCompare(b.jurorNumber);
+    return a.jurorNumber.localeCompare(b.jurorNumber, undefined, { numeric: true });
   });
 }
 
@@ -199,7 +183,7 @@ export const JurorDetailDrawer: React.FC = () => {
         // Flush any pending text changes for current juror before moving
         flushUpdates();
 
-        const ordered = getOrderedJurors(jurors, activeCase, currentJuror);
+        const ordered = getOrderedJurors(jurors, activeCase);
         if (ordered.length === 0) return;
 
         let nextIdx = 0;
