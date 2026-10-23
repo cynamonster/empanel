@@ -183,13 +183,20 @@ export const JurorCard: React.FC<JurorCardProps> = ({
           <div className="truncate flex items-center space-x-1">
             <span className="text-slate-300 truncate">{juror.occupation || ''}</span>
           </div>
-          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
-            <span>
-              {juror.age ? `${juror.age}y` : ''}{juror.age && juror.gender ? ' • ' : ''}{juror.gender || ''}
+          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5 gap-1">
+            <span className="truncate">
+              {[juror.age ? `${juror.age}y` : null, juror.gender, juror.raceEthnicity]
+                .filter(Boolean)
+                .join(' • ')}
             </span>
-            {/* <span className="truncate max-w-[120px] text-slate-500 text-right">
-              {juror.cityState || juror.cityOrZip || ''}
-            </span> */}
+            {(juror.areaOfCounty || juror.cityState || juror.cityOrZip) && (
+              <span
+                className="truncate max-w-[95px] text-[10px] text-slate-500 text-right shrink-0"
+                title={juror.areaOfCounty || juror.cityState || juror.cityOrZip}
+              >
+                {juror.areaOfCounty || juror.cityState || juror.cityOrZip}
+              </span>
+            )}
           </div>
         </div>
       )}

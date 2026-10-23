@@ -64,6 +64,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
       occupation: manualOcc.trim() || undefined,
       age: manualAge.trim() || undefined,
       gender: manualGender.trim() || undefined,
+      areaOfCounty: manualCity.trim() || undefined,
       cityState: manualCity.trim() || undefined,
       cityOrZip: manualCity.trim() || undefined,
       rating: 0,
@@ -171,7 +172,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
                   {fileName ? fileName : 'Choose CSV/TSV File or Drag & Drop'}
                 </div>
                 <div className="text-xs text-slate-500 mt-1">
-                  Supports court-provided rosters (Juror #, Name, Occupation, Age, City/State)
+                  Supports court-provided rosters (Juror #, Name, Occupation, Age, Area of County)
                 </div>
               </div>
             </div>
@@ -184,7 +185,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
               </p>
               <textarea
                 rows={5}
-                placeholder={"1\tJane Doe\tAccountant\t45\tAustin, TX\n2\tJohn Smith\tElectrician\t38\tRound Rock, TX"}
+                placeholder={"1\tJane Doe\tAccountant\t45\tNorth County\n2\tJohn Smith\tElectrician\t38\tSouth County"}
                 value={rawText}
                 onChange={e => setRawText(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 font-mono outline-none focus:border-indigo-500 resize-none"
@@ -258,10 +259,10 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
                   />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="text-[10px] text-slate-400 block mb-1">City, State</label>
+                  <label className="text-[10px] text-slate-400 block mb-1">Area of County</label>
                   <input
                     type="text"
-                    placeholder="e.g. Austin, TX"
+                    placeholder="e.g. North County, East District"
                     value={manualCity}
                     onChange={e => setManualCity(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none"
@@ -303,7 +304,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
                       <th className="p-2">Full Name</th>
                       <th className="p-2">Occupation</th>
                       <th className="p-2">Age/Gender</th>
-                      <th className="p-2">City, State</th>
+                      <th className="p-2">Area of County</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-850">
@@ -313,7 +314,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
                         <td className="p-2 font-medium text-slate-200">{p.fullName}</td>
                         <td className="p-2 text-slate-400">{p.occupation || '—'}</td>
                         <td className="p-2 text-slate-400">{p.age || ''} {p.gender || ''}</td>
-                        <td className="p-2 text-slate-400">{p.cityState || p.cityOrZip || '—'}</td>
+                        <td className="p-2 text-slate-400">{p.areaOfCounty || p.cityState || p.cityOrZip || '—'}</td>
                       </tr>
                     ))}
                   </tbody>

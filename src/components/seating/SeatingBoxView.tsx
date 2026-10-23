@@ -634,34 +634,26 @@ export const SeatingBoxView: React.FC = () => {
               ))}
             </div>
 
-            {/* Vertical Aisle Walkway Toggle */}
-            <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs">
-              <span className="text-[10px] text-slate-400 font-semibold px-2 uppercase tracking-wider hidden sm:inline">
-                Aisle:
+            {/* Vertical Aisle Walkway Simple On/Off Toggle */}
+            <button
+              type="button"
+              onClick={() => updateActiveCase({ galleryGutters: gutters === 'none' ? '1' : 'none' })}
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                gutters === '1'
+                  ? 'bg-indigo-950/70 border-indigo-600 text-indigo-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+              }`}
+              title={gutters === '1' ? 'Aisle is ON (click to turn OFF)' : 'Aisle is OFF (click to turn ON)'}
+            >
+              <span>Aisle</span>
+              <span
+                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                  gutters === '1' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                {gutters === '1' ? 'ON' : 'OFF'}
               </span>
-              <button
-                onClick={() => updateActiveCase({ galleryGutters: 'none' })}
-                className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                  gutters === 'none'
-                    ? 'bg-indigo-600 text-white shadow'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Continuous gallery bench"
-              >
-                None
-              </button>
-              <button
-                onClick={() => updateActiveCase({ galleryGutters: '1' })}
-                className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                  gutters === '1'
-                    ? 'bg-indigo-600 text-white shadow'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="1 Central Walkway Aisle"
-              >
-                1 Central
-              </button>
-            </div>
+            </button>
 
             {/* Origin Toggle (Courtroom Bottom-Left vs Top-Left vs Top-Right) */}
             <button
@@ -678,19 +670,24 @@ export const SeatingBoxView: React.FC = () => {
               </span>
             </button>
 
-            {/* Column Selector */}
+            {/* Custom Column Selector */}
             <div className="flex items-center space-x-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 text-xs text-slate-400">
-              <span>Cols:</span>
-              <select
+              <label htmlFor="box-grid-cols" className="cursor-pointer">Cols:</label>
+              <input
+                id="box-grid-cols"
+                type="number"
+                min={2}
+                max={30}
                 value={gridCols}
-                onChange={e => updateActiveCase({ gridCols: parseInt(e.target.value, 10) })}
-                className="bg-transparent text-slate-200 font-semibold outline-none cursor-pointer"
-              >
-                <option value="6" className="bg-slate-900">6</option>
-                <option value="8" className="bg-slate-900">8</option>
-                <option value="10" className="bg-slate-900">10</option>
-                <option value="12" className="bg-slate-900">12</option>
-              </select>
+                onChange={e => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val) && val >= 2 && val <= 30) {
+                    updateActiveCase({ gridCols: val });
+                  }
+                }}
+                className="w-12 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-slate-200 font-semibold text-center outline-none focus:border-indigo-500"
+                title="Enter custom number of columns (2-30)"
+              />
             </div>
           </div>
         </div>
@@ -923,7 +920,7 @@ export const SeatingBoxView: React.FC = () => {
                           {juror.fullName || `Juror #${juror.jurorNumber}`}
                         </div>
                         <div className="text-[11px] text-slate-400 truncate">
-                          {juror.occupation || 'No occupation'} {juror.cityState ? `• ${juror.cityState}` : ''}
+                          {juror.occupation || 'No occupation'} {(juror.areaOfCounty || juror.cityState) ? `• ${juror.areaOfCounty || juror.cityState}` : ''}
                         </div>
                       </div>
                     </div>

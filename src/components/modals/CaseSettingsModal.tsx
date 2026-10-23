@@ -227,28 +227,42 @@ export const CaseSettingsModal: React.FC<CaseSettingsModalProps> = ({ isOpen, on
               </select>
             </div>
             <div>
-              <span className="text-[10px] text-slate-400 block mb-1">Grid Columns</span>
-              <select
+              <label className="text-[10px] text-slate-400 block mb-1">Gallery Columns</label>
+              <input
+                type="number"
+                min={2}
+                max={30}
                 value={gridCols}
-                onChange={e => setGridCols(parseInt(e.target.value, 10))}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100 outline-none"
-              >
-                <option value={6}>6 Columns</option>
-                <option value={8}>8 Columns</option>
-                <option value={10}>10 Columns</option>
-                <option value={12}>12 Columns</option>
-              </select>
+                onChange={e => {
+                  const val = parseInt(e.target.value, 10);
+                  setGridCols(isNaN(val) ? 8 : Math.max(2, Math.min(30, val)));
+                }}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 outline-none focus:border-indigo-500 font-semibold"
+                placeholder="e.g. 8"
+              />
             </div>
             <div className="col-span-2">
-              <span className="text-[10px] text-slate-400 block mb-1">Venire Gallery Vertical Aisles</span>
-              <select
-                value={galleryGutters}
-                onChange={e => setGalleryGutters(e.target.value as any)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100 outline-none"
+              <label className="text-[10px] text-slate-400 block mb-1">Center Walkway Aisle</label>
+              <button
+                type="button"
+                onClick={() => setGalleryGutters(galleryGutters === 'none' ? '1' : 'none')}
+                className={`flex items-center justify-between w-full px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${
+                  galleryGutters === '1'
+                    ? 'bg-indigo-950/70 border-indigo-600 text-indigo-300'
+                    : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                }`}
               >
-                <option value="none">None (Continuous Bench)</option>
-                <option value="1">1 Central Aisle (2 Sections)</option>
-              </select>
+                <span>{galleryGutters === '1' ? 'Central Walkway Aisle Enabled' : 'No Aisle (Continuous Bench)'}</span>
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                    galleryGutters === '1'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {galleryGutters === '1' ? 'ON' : 'OFF'}
+                </span>
+              </button>
             </div>
             <div>
               <span className="text-[10px] text-slate-400 block mb-1">Seating Orientation</span>

@@ -82,7 +82,7 @@ export function mapRowsToJurors(matrix: string[][], caseId: string): Juror[] {
     dataRows = matrix.slice(1);
   } else {
     // Synthetic headers based on common 1-indexed format: No, Name, Occupation, Age
-    headers = ['Juror #', 'Full Name', 'Occupation', 'Age', 'City, State'];
+    headers = ['Juror #', 'Full Name', 'Occupation', 'Age', 'Area of County'];
     dataRows = matrix;
   }
 
@@ -93,7 +93,7 @@ export function mapRowsToJurors(matrix: string[][], caseId: string): Juror[] {
   const raceIdx = findIndex(headers, [/race/, /ethnicity/]);
   const occIdx = findIndex(headers, [/occupation/, /job/, /title/, /profession/]);
   const empIdx = findIndex(headers, [/employer/, /company/]);
-  const cityIdx = findIndex(headers, [/city/, /state/, /residence/, /county/, /address/]);
+  const cityIdx = findIndex(headers, [/area/, /county/, /precinct/, /district/, /city/, /state/, /residence/, /address/]);
   const maritalIdx = findIndex(headers, [/marital/, /spouse/]);
   const eduIdx = findIndex(headers, [/education/, /degree/, /school/]);
 
@@ -131,6 +131,7 @@ export function mapRowsToJurors(matrix: string[][], caseId: string): Juror[] {
       raceEthnicity: raceEthnicity ? raceEthnicity.trim() : undefined,
       occupation: occupation ? occupation.trim() : undefined,
       employer: employer ? employer.trim() : undefined,
+      areaOfCounty: cityOrZip ? cityOrZip.trim() : undefined,
       cityState: cityOrZip ? cityOrZip.trim() : undefined,
       cityOrZip: cityOrZip ? cityOrZip.trim() : undefined,
       maritalStatus: maritalStatus ? maritalStatus.trim() : undefined,

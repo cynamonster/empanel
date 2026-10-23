@@ -690,12 +690,12 @@ export const JurorDetailDrawer: React.FC = () => {
               />
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px]">City, State</span>
+              <span className="text-slate-500 block text-[10px]">Area of County</span>
               <input
                 type="text"
-                value={juror.cityState || juror.cityOrZip || ''}
-                onChange={e => updateJuror(juror.id, { cityState: e.target.value })}
-                placeholder="e.g. Austin, TX"
+                value={juror.areaOfCounty || juror.cityState || juror.cityOrZip || ''}
+                onChange={e => updateJuror(juror.id, { areaOfCounty: e.target.value, cityState: e.target.value })}
+                placeholder="e.g. North County, East Austin"
                 className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
               />
             </div>

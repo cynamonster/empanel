@@ -18,6 +18,7 @@ export interface Juror {
   raceEthnicity?: string;
   occupation?: string;
   employer?: string;
+  areaOfCounty?: string;
   cityState?: string;
   cityOrZip?: string;
   maritalStatus?: string;
