@@ -38,8 +38,10 @@ export const JurorCard: React.FC<JurorCardProps> = ({
   const [isBadgeHovered, setIsBadgeHovered] = useState(false);
   const [isInputOpen, setIsInputOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const badgeRef = useRef<HTMLButtonElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isOpeningInputRef = useRef(false);
 
   const currentResponse = activeQuestionId ? juror.responses?.[activeQuestionId] : undefined;
   const isHandRaised = !!currentResponse?.answeredYes;
@@ -78,12 +80,18 @@ export const JurorCard: React.FC<JurorCardProps> = ({
   };
 
   const handleCardMouseLeave = (e: React.MouseEvent) => {
-    setIsHovered(false);
-    setIsBadgeHovered(false);
     const related = e.relatedTarget as Node | null;
-    if (inputContainerRef.current && related && inputContainerRef.current.contains(related)) {
+    if (
+      (inputContainerRef.current && related && inputContainerRef.current.contains(related)) ||
+      (badgeRef.current && related && badgeRef.current.contains(related))
+    ) {
       return;
     }
+    if (isOpeningInputRef.current) {
+      return;
+    }
+    setIsHovered(false);
+    setIsBadgeHovered(false);
     if (isInputOpen) {
       saveNote();
       setIsInputOpen(false);
@@ -91,13 +99,40 @@ export const JurorCard: React.FC<JurorCardProps> = ({
   };
 
   const handleInputContainerMouseLeave = (e: React.MouseEvent) => {
+    if (isOpeningInputRef.current) {
+      return;
+    }
     const related = e.relatedTarget as Node | null;
-    if (cardRef.current && related && cardRef.current.contains(related)) {
+    if (
+      (cardRef.current && related && cardRef.current.contains(related)) ||
+      (badgeRef.current && related && badgeRef.current.contains(related))
+    ) {
       return;
     }
     if (isInputOpen) {
       saveNote();
       setIsInputOpen(false);
+      setIsHovered(false);
+      setIsBadgeHovered(false);
+    }
+  };
+
+  const handleBadgeMouseEnter = () => {
+    setIsHovered(true);
+    setIsBadgeHovered(true);
+  };
+
+  const handleBadgeMouseLeave = (e: React.MouseEvent) => {
+    setIsBadgeHovered(false);
+    const related = e.relatedTarget as Node | null;
+    if (
+      (cardRef.current && related && cardRef.current.contains(related)) ||
+      (inputContainerRef.current && related && inputContainerRef.current.contains(related))
+    ) {
+      return;
+    }
+    if (!isInputOpen && !isOpeningInputRef.current) {
+      setIsHovered(false);
     }
   };
 
@@ -124,8 +159,12 @@ export const JurorCard: React.FC<JurorCardProps> = ({
     if (selectedJurorId) {
       setSelectedJurorId(juror.id);
     }
+    isOpeningInputRef.current = true;
     setIsInputOpen(true);
     setIsBadgeHovered(false);
+    setTimeout(() => {
+      isOpeningInputRef.current = false;
+    }, 300);
   };
 
   const isSelected = selectedJurorId === juror.id;
@@ -324,7 +363,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
               ref={inputContainerRef}
               onClick={e => e.stopPropagation()}
               onMouseLeave={handleInputContainerMouseLeave}
-              className="absolute inset-x-1 -top-3 z-40 bg-slate-900 border border-amber-400 rounded-xl p-1.5 shadow-2xl flex items-center space-x-1.5 ring-2 ring-amber-400/40"
+              className="absolute left-1 -right-2 -top-3 z-40 bg-slate-900 border border-amber-400 rounded-xl p-1.5 shadow-2xl flex items-center space-x-1.5 ring-2 ring-amber-400/40"
             >
               <MessageSquareText className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 ml-1" />
               <input
@@ -339,15 +378,16 @@ export const JurorCard: React.FC<JurorCardProps> = ({
             </div>
           ) : (
             <button
+              ref={badgeRef}
               type="button"
               onClick={handleIconClick}
-              onMouseEnter={() => setIsBadgeHovered(true)}
-              onMouseLeave={() => setIsBadgeHovered(false)}
+              onMouseEnter={handleBadgeMouseEnter}
+              onMouseLeave={handleBadgeMouseLeave}
               className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center border transition-all duration-200 z-20 hover:bg-amber-800 hover:border-amber-700 hover:text-amber-100 hover:shadow-inner hover:ring-0 ${
                 isBadgeHovered
                   ? 'bg-amber-800 border-amber-700 text-amber-100 scale-110 shadow-inner ring-0'
                   : isHovered
-                  ? 'bg-amber-400 border-amber-200 text-slate-950 scale-110 shadow-[0_0_15px_rgba(251,191,36,0.95)] ring-2 ring-amber-300/80'
+                  ? 'bg-amber-400 border-amber-200 text-slate-950 scale-110 shadow-[0_0_15px_rgba(251,191,36,0.95)]'
                   : isHandRaised
                   ? 'bg-amber-500 border-amber-300 text-slate-950 scale-110 shadow-md shadow-amber-500/40'
                   : 'bg-slate-800 border-slate-600 text-slate-500 shadow-none'
