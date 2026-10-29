@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import type { Case, Juror, Question, CauseChallenge, PeremptoryStrikeAction } from '../types';
-import { db, createDefaultCase } from '../db';
+import React, { createContext, useContext, useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import type { Case, Juror, Question, CauseChallenge, PeremptoryStrikeAction, ViewMode, SyncStatus, WhisperMessage } from '../types';
+import { db, createDefaultCase, getSavedViewerPin, saveViewerPin, clearSavedViewerPin } from '../db';
 import { getDemoCaseData } from '../data/demoCase';
+import { syncSession } from '../sync/syncSession';
+import { generatePin } from '../sync/crypto';
 
 interface CaseContextValue {
   cases: Case[];
@@ -21,6 +23,27 @@ interface CaseContextValue {
   setSearchTerm: (term: string) => void;
   statusFilter: string;
   setStatusFilter: (filter: string) => void;
+
+  // View mode
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
+
+  // Real-time E2EE Sync & Pairing
+  syncStatus: SyncStatus;
+  syncRole: 'host' | 'viewer' | null;
+  syncPin: string | null;
+  syncAttempts: { current: number; max: number };
+  syncLatency: number | null;
+  startHostingSync: () => Promise<string>;
+  joinSyncSession: (pin: string) => Promise<void>;
+  burnSyncRoom: () => void;
+  disconnectSync: () => void;
+
+  // Real-time Whispers (Prompter cues)
+  whispers: WhisperMessage[];
+  activeWhisper: WhisperMessage | null;
+  sendWhisper: (text: string, priority?: 'normal' | 'urgent') => Promise<WhisperMessage | undefined>;
+  dismissWhisper: (messageId: string) => void;
 
   // Case operations
   switchCase: (caseId: string) => Promise<void>;
@@ -83,6 +106,41 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  // View Mode & E2EE Sync State
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      if (typeof window !== 'undefined' && localStorage.getItem('empanel_viewer_pin')) {
+        return 'podium';
+      }
+    } catch (e) {}
+    return 'table';
+  });
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const [syncRole, setSyncRole] = useState<'host' | 'viewer' | null>(() => {
+    try {
+      if (typeof window !== 'undefined' && localStorage.getItem('empanel_viewer_pin')) {
+        return 'viewer';
+      }
+    } catch (e) {}
+    return null;
+  });
+  const [syncPin, setSyncPin] = useState<string | null>(null);
+  const [syncAttempts, setSyncAttempts] = useState<{ current: number; max: number }>({ current: 0, max: 3 });
+  const [syncLatency, setSyncLatency] = useState<number | null>(null);
+  const [whispers, setWhispers] = useState<WhisperMessage[]>([]);
+  const [activeWhisper, setActiveWhisper] = useState<WhisperMessage | null>(null);
+
+  const activeCaseRef = useRef(activeCase);
+  activeCaseRef.current = activeCase;
+  const jurorsRef = useRef(jurors);
+  jurorsRef.current = jurors;
+  const questionsRef = useRef(questions);
+  questionsRef.current = questions;
+  const causeChallengesRef = useRef(causeChallenges);
+  causeChallengesRef.current = causeChallenges;
+  const peremptoryStrikesRef = useRef(peremptoryStrikes);
+  peremptoryStrikesRef.current = peremptoryStrikes;
+
   // History for Undo / Redo
   const [undoStack, setUndoStack] = useState<{
     jurors: Juror[];
@@ -139,6 +197,203 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     refreshData();
+
+    // Auto-reconnect viewer session if a PIN is stored in IndexedDB / localStorage
+    getSavedViewerPin().then(savedPin => {
+      if (savedPin) {
+        joinSyncSession(savedPin).catch(err => {
+          console.warn('Failed to auto-reconnect viewer session:', err);
+        });
+      }
+    });
+  }, []);
+
+  // Listen for real-time E2EE sync events from peer (Podium or Second Chair)
+  useEffect(() => {
+    syncSession.setEvents({
+      onStatusChange: (status) => {
+        setSyncStatus(status);
+        if (status === 'burned') {
+          clearSavedViewerPin().catch(() => {});
+        }
+        if (status === 'connected_p2p' || status === 'connected_relay') {
+          if (syncSession.getRole() === 'host') {
+            // Broadcast initial state snapshot to the newly paired viewer
+            syncSession.sendMutation({
+              type: 'SNAPSHOT',
+              payload: {
+                activeCase: activeCaseRef.current,
+                jurors: jurorsRef.current,
+                questions: questionsRef.current,
+                causeChallenges: causeChallengesRef.current,
+                peremptoryStrikes: peremptoryStrikesRef.current,
+              },
+            });
+          }
+        }
+      },
+      onAttemptChange: (current, max) => {
+        setSyncAttempts({ current, max });
+      },
+      onLatencyUpdate: (latencyMs) => {
+        setSyncLatency(latencyMs);
+      },
+      onWhisperReceived: (whisper) => {
+        setWhispers(prev => [whisper, ...prev]);
+        setActiveWhisper(whisper);
+      },
+      onMutationReceived: async (mutation) => {
+        switch (mutation.type) {
+          case 'SNAPSHOT':
+            if (mutation.payload.activeCase) setActiveCase(mutation.payload.activeCase);
+            if (mutation.payload.jurors) setJurors(mutation.payload.jurors);
+            if (mutation.payload.questions) setQuestions(mutation.payload.questions);
+            if (mutation.payload.causeChallenges) setCauseChallenges(mutation.payload.causeChallenges);
+            if (mutation.payload.peremptoryStrikes) setPeremptoryStrikes(mutation.payload.peremptoryStrikes);
+            break;
+
+          case 'REQUEST_SNAPSHOT':
+            if (syncSession.getRole() === 'host') {
+              syncSession.sendMutation({
+                type: 'SNAPSHOT',
+                payload: {
+                  activeCase: activeCaseRef.current,
+                  jurors: jurorsRef.current,
+                  questions: questionsRef.current,
+                  causeChallenges: causeChallengesRef.current,
+                  peremptoryStrikes: peremptoryStrikesRef.current,
+                },
+              });
+            }
+            break;
+
+          case 'BATCH_JUROR_UPDATE':
+            setJurors(prev => {
+              const map = new Map(mutation.jurors.map((u: any) => [u.id, u]));
+              return prev.map(j => map.get(j.id) || j);
+            });
+            db.jurors.bulkPut(mutation.jurors).catch(() => {});
+            break;
+
+          case 'UPDATE_JUROR':
+            setJurors(prev =>
+              prev.map(j => (j.id === mutation.jurorId ? { ...j, ...mutation.updates, updatedAt: Date.now() } : j))
+            );
+            break;
+
+          case 'UPDATE_CASE':
+            setActiveCase(prev => (prev ? { ...prev, ...mutation.updates, updatedAt: Date.now() } : null));
+            break;
+
+          case 'TOGGLE_RESPONSE':
+            setJurors(prev =>
+              prev.map(j => {
+                if (j.id !== mutation.jurorId) return j;
+                const existing = j.responses?.[mutation.questionId]?.answeredYes;
+                const existingNote = j.responses?.[mutation.questionId]?.note;
+                return {
+                  ...j,
+                  responses: {
+                    ...(j.responses || {}),
+                    [mutation.questionId]: {
+                      answeredYes: !existing,
+                      note: existingNote,
+                    },
+                  },
+                };
+              })
+            );
+            break;
+
+          case 'ASSIGN_SEAT':
+            setJurors(prev =>
+              prev.map(j => {
+                if (j.id === mutation.jurorId) {
+                  return {
+                    ...j,
+                    seatNumber: mutation.seatNumber,
+                    isAlternate: mutation.isAlternate,
+                    status: mutation.isAlternate ? 'alternate' : 'seated',
+                  };
+                }
+                return j;
+              })
+            );
+            break;
+
+          case 'UNSEAT_JUROR':
+            setJurors(prev =>
+              prev.map(j => {
+                if (j.id === mutation.jurorId) {
+                  return {
+                    ...j,
+                    seatNumber: undefined,
+                    isAlternate: false,
+                    status: j.status === 'seated' || j.status === 'alternate' ? 'active' : j.status,
+                  };
+                }
+                return j;
+              })
+            );
+            break;
+
+          case 'RECORD_STRIKE':
+            setPeremptoryStrikes(prev => [mutation.strike, ...prev]);
+            setJurors(prev =>
+              prev.map(j =>
+                j.id === mutation.strike.jurorId
+                  ? {
+                      ...j,
+                      status:
+                        mutation.strike.side === 'plaintiff_prosecution'
+                          ? 'struck_plaintiff'
+                          : 'struck_defense',
+                      seatNumber: undefined,
+                      isAlternate: false,
+                    }
+                  : j
+              )
+            );
+            break;
+
+          case 'RECORD_CAUSE':
+            setCauseChallenges(prev => [mutation.challenge, ...prev]);
+            if (mutation.challenge.ruling === 'granted') {
+              setJurors(prev =>
+                prev.map(j =>
+                  j.id === mutation.challenge.jurorId
+                    ? { ...j, status: 'cause_granted', seatNumber: undefined, isAlternate: false }
+                    : j
+                )
+              );
+            }
+            break;
+
+          case 'REVERT_STRIKE':
+            setPeremptoryStrikes(prev => prev.filter(s => s.jurorId !== mutation.jurorId));
+            setCauseChallenges(prev => prev.filter(c => c.jurorId !== mutation.jurorId));
+            setJurors(prev =>
+              prev.map(j => {
+                if (j.id === mutation.jurorId) {
+                  return {
+                    ...j,
+                    status: j.seatNumber !== undefined ? (j.isAlternate ? 'alternate' : 'seated') : 'active',
+                  };
+                }
+                return j;
+              })
+            );
+            break;
+
+          case 'DISMISS_WHISPER':
+            setActiveWhisper(prev => (prev?.id === mutation.messageId ? null : prev));
+            setWhispers(prev =>
+              prev.map(w => (w.id === mutation.messageId ? { ...w, dismissed: true } : w))
+            );
+            break;
+        }
+      },
+    });
   }, []);
 
   const switchCase = async (caseId: string) => {
@@ -177,6 +432,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await db.cases.put(updated);
     setActiveCase(updated);
     setCases(prev => prev.map(c => c.id === updated.id ? updated : c));
+    syncSession.sendMutation({ type: 'UPDATE_CASE', updates });
   };
 
   const deleteCase = async (caseId: string) => {
@@ -213,6 +469,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated: Juror = { ...existing, ...updates, updatedAt: Date.now() };
     await db.jurors.put(updated);
     setJurors(prev => prev.map(j => j.id === jurorId ? updated : j));
+    syncSession.sendMutation({ type: 'UPDATE_JUROR', jurorId, updates });
   };
 
   const deleteJuror = async (jurorId: string) => {
@@ -268,6 +525,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const map = new Map(toUpdate.map(u => [u.id, u]));
       return prev.map(j => map.get(j.id) || j);
     });
+    syncSession.sendMutation({ type: 'ASSIGN_SEAT', jurorId, seatNumber, isAlternate });
   };
 
   const unseatJuror = async (jurorId: string) => {
@@ -291,6 +549,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await db.jurors.put(updated);
       setJurors(prev => prev.map(j => j.id === jurorId ? updated : j));
     }
+    syncSession.sendMutation({ type: 'UNSEAT_JUROR', jurorId });
   };
 
   const setJurorRating = async (jurorId: string, rating: number) => {
@@ -344,6 +603,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     
     await updateJuror(jurorId, { responses: newResponses });
+    syncSession.sendMutation({ type: 'TOGGLE_RESPONSE', jurorId, questionId });
   };
 
   const recordPeremptoryStrike = async (
@@ -397,6 +657,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await db.jurors.put(struckUpdate);
       setJurors(prev => prev.map(j => j.id === jurorId ? struckUpdate : j));
     }
+    syncSession.sendMutation({ type: 'RECORD_STRIKE', strike: strikeAction });
   };
 
   const shiftAndPullReplacement = async (
@@ -550,6 +811,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const updateMap = new Map(updates.map(u => [u.id, u]));
         return prev.map(j => updateMap.get(j.id) || j);
       });
+      syncSession.sendMutation({ type: 'BATCH_JUROR_UPDATE', jurors: updates });
     }
   };
 
@@ -612,6 +874,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await db.jurors.put(causeUpdate);
       setJurors(prev => prev.map(j => j.id === jurorId ? causeUpdate : j));
     }
+    syncSession.sendMutation({ type: 'RECORD_CAUSE', challenge: cause });
   };
 
   const revertStrike = async (jurorId: string) => {
@@ -628,6 +891,57 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       status: 'active',
       statusNotes: undefined,
     });
+    syncSession.sendMutation({ type: 'REVERT_STRIKE', jurorId });
+  };
+
+  // E2EE Sync Session & Whisper Controls
+  const startHostingSync = async (): Promise<string> => {
+    const pin = generatePin();
+    setSyncPin(pin);
+    setSyncRole('host');
+    await syncSession.startHosting(pin);
+    return pin;
+  };
+
+  const joinSyncSession = async (pin: string): Promise<void> => {
+    setSyncPin(pin);
+    setSyncRole('viewer');
+    await saveViewerPin(pin);
+    await syncSession.joinSession(pin);
+    setViewMode('podium'); // Automatically switch viewer into podium glanceable mode
+  };
+
+  const burnSyncRoom = () => {
+    clearSavedViewerPin().catch(() => {});
+    syncSession.burnRoom();
+    setSyncPin(null);
+    setSyncAttempts({ current: 3, max: 3 });
+  };
+
+  const disconnectSync = () => {
+    clearSavedViewerPin().catch(() => {});
+    syncSession.cleanup();
+    setSyncPin(null);
+    setSyncRole(null);
+    setSyncStatus('idle');
+    setViewMode('table');
+  };
+
+  const sendWhisper = async (text: string, priority: 'normal' | 'urgent' = 'normal') => {
+    const w = await syncSession.sendWhisper(text, priority);
+    if (w) {
+      setWhispers(prev => [w, ...prev]);
+      setActiveWhisper(w);
+    }
+    return w;
+  };
+
+  const dismissWhisper = (messageId: string) => {
+    setActiveWhisper(null);
+    setWhispers(prev =>
+      prev.map(w => (w.id === messageId ? { ...w, dismissed: true } : w))
+    );
+    syncSession.sendMutation({ type: 'DISMISS_WHISPER', messageId });
   };
 
   const undo = async () => {
@@ -731,6 +1045,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     await db.jurors.bulkPut(updatedJurors);
     setJurors(updatedJurors);
+    syncSession.sendMutation({ type: 'BATCH_JUROR_UPDATE', jurors: updatedJurors });
 
     if (enableAutoFill !== undefined) {
       await updateActiveCase({ autoFillPanel: enableAutoFill });
@@ -756,6 +1071,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     await db.jurors.bulkPut(updatedJurors);
     setJurors(updatedJurors);
+    syncSession.sendMutation({ type: 'BATCH_JUROR_UPDATE', jurors: updatedJurors });
   };
 
   const toggleAutoFillPanel = async () => {
@@ -874,6 +1190,21 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSearchTerm,
     statusFilter,
     setStatusFilter,
+    viewMode,
+    setViewMode,
+    syncStatus,
+    syncRole,
+    syncPin,
+    syncAttempts,
+    syncLatency,
+    startHostingSync,
+    joinSyncSession,
+    burnSyncRoom,
+    disconnectSync,
+    whispers,
+    activeWhisper,
+    sendWhisper,
+    dismissWhisper,
     switchCase,
     createNewCase,
     updateActiveCase,
@@ -914,6 +1245,14 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     activeQuestionId,
     searchTerm,
     statusFilter,
+    viewMode,
+    syncStatus,
+    syncRole,
+    syncPin,
+    syncAttempts,
+    syncLatency,
+    whispers,
+    activeWhisper,
     undoStack.length,
     redoStack.length,
   ]);

@@ -112,3 +112,25 @@ export interface PeremptoryStrikeAction {
   timestamp: number;
   notes?: string;
 }
+
+export interface WhisperMessage {
+  id: string;
+  sender: 'second_chair' | 'podium';
+  text: string;
+  timestamp: number;
+  priority?: 'normal' | 'urgent';
+  dismissed?: boolean;
+}
+
+export type ViewMode = 'table' | 'podium';
+
+export type SyncStatus = 
+  | 'idle' 
+  | 'hosting' 
+  | 'joining' 
+  | 'connected_p2p' 
+  | 'connected_relay' 
+  | 'burned' 
+  | 'disconnected'
+  | 'error';
+

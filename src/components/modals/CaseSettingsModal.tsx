@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useCase } from '../../context/CaseContext';
-import { Settings, Trash2, Check, Scale } from 'lucide-react';
+import { Settings, Trash2, Check, Scale, Download, FileSpreadsheet, FileJson } from 'lucide-react';
+import { exportJurorsToCSV, exportCaseBackupJSON } from '../../utils/exportUtils';
 
 interface CaseSettingsModalProps {
   isOpen: boolean;
@@ -8,7 +9,15 @@ interface CaseSettingsModalProps {
 }
 
 export const CaseSettingsModal: React.FC<CaseSettingsModalProps> = ({ isOpen, onClose }) => {
-  const { activeCase, updateActiveCase, deleteCase } = useCase();
+  const {
+    activeCase,
+    updateActiveCase,
+    deleteCase,
+    jurors,
+    questions,
+    causeChallenges,
+    peremptoryStrikes,
+  } = useCase();
 
   if (!isOpen || !activeCase) return null;
 
@@ -276,6 +285,43 @@ export const CaseSettingsModal: React.FC<CaseSettingsModalProps> = ({ isOpen, on
                 <option value="top-right">Juror #1 at Top-Right (Back of Court View)</option>
               </select>
             </div>
+          </div>
+        </div>
+
+        {/* Export & Data Backup */}
+        <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 space-y-2.5">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+            Export & Data Backup
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (activeCase) exportJurorsToCSV(jurors, activeCase.name);
+              }}
+              className="flex items-center justify-center space-x-2 px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 rounded-xl text-xs font-medium text-slate-200 transition-colors"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <span>Export Jurors as CSV</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (activeCase) {
+                  exportCaseBackupJSON(
+                    activeCase,
+                    jurors,
+                    questions,
+                    causeChallenges,
+                    peremptoryStrikes
+                  );
+                }
+              }}
+              className="flex items-center justify-center space-x-2 px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 rounded-xl text-xs font-medium text-slate-200 transition-colors"
+            >
+              <FileJson className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+              <span>Download Full JSON Backup</span>
+            </button>
           </div>
         </div>
 
