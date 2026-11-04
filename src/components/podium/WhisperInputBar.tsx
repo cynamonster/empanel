@@ -21,6 +21,10 @@ export const WhisperInputBar: React.FC<WhisperInputBarProps> = ({ onOpenPairModa
 
   const isConnected = syncStatus === 'connected_p2p' || syncStatus === 'connected_relay';
 
+  if (!isConnected) {
+    return null;
+  }
+
   const handleSend = async (cueText?: string) => {
     const toSend = cueText || text;
     if (!toSend.trim()) return;

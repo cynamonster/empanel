@@ -13,7 +13,7 @@ import { PodiumView } from './components/podium/PodiumView';
 import { WhisperInputBar } from './components/podium/WhisperInputBar';
 
 const CourtroomWorkspace: React.FC = () => {
-  const { viewMode, syncRole } = useCase();
+  const { viewMode, syncRole, syncStatus } = useCase();
 
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
   const [isStrikeConsoleOpen, setIsStrikeConsoleOpen] = useState(false);
@@ -67,8 +67,10 @@ const CourtroomWorkspace: React.FC = () => {
         <JurorDetailDrawer />
       </div>
 
-      {/* Second Chair Whisper Input & Live Sync Status Bar */}
-      <WhisperInputBar onOpenPairModal={handleOpenPairModal} />
+      {/* Second Chair Whisper Input & Live Sync Status Bar (only visible when connected) */}
+      {(syncStatus === 'connected_p2p' || syncStatus === 'connected_relay') && (
+        <WhisperInputBar onOpenPairModal={handleOpenPairModal} />
+      )}
 
       {/* Modals */}
       <IntakeModal isOpen={isIntakeOpen} onClose={() => setIsIntakeOpen(false)} />
