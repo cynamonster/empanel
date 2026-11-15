@@ -56,6 +56,7 @@ type SignalingMessage =
 export interface SyncSessionEvents {
   onStatusChange?: (status: SyncStatus) => void;
   onAttemptChange?: (attempts: number, max: number) => void;
+  onPeerJoined?: () => void;
   onMutationReceived?: (mutation: SyncMutation) => void;
   onWhisperReceived?: (whisper: WhisperMessage) => void;
   onError?: (error: string) => void;
@@ -272,6 +273,7 @@ export class SyncSession {
             const isValid = await verifyAuthProof(this.cryptoKey, 'empanel-join', msg.proof);
             if (isValid) {
               this.sendSignalingMessage({ type: 'AUTH_SUCCESS' });
+              this.events.onPeerJoined?.();
               await this.initWebRTC(true);
             } else {
               // Wrong PIN on viewer - inform viewer without burning room

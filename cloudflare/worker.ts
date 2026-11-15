@@ -40,9 +40,9 @@ export default {
       }
       const room = rooms.get(roomId)!;
 
-      // Restrict room to max 2 participants (1-to-1 sync for free tier)
-      if (room.size >= 2) {
-        server.send(JSON.stringify({ type: 'ERROR', message: 'Room full' }));
+      // Allow multiple participants to join room (multi-device sync)
+      if (room.size >= 10) {
+        server.send(JSON.stringify({ type: 'ERROR', message: 'Room capacity reached' }));
         server.close(1008, 'Room capacity reached');
         return new Response(null, { status: 101, webSocket: client });
       }

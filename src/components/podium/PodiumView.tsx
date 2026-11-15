@@ -46,6 +46,16 @@ export const PodiumView: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [highContrastLight, setHighContrastLight] = useState(false);
   const [spotlightJurorId, setSpotlightJurorId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  // Window resize listener to dynamically toggle compact card grid on mobile
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Fullscreen toggle
   const toggleFullscreen = () => {
@@ -148,11 +158,11 @@ export const PodiumView: React.FC = () => {
     <div className={`h-screen w-screen overflow-hidden flex flex-col font-sans transition-colors duration-150 ${themeClasses}`}>
       
       {/* Top Lectern HUD */}
-      <header className="px-6 py-3 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between shadow-md relative z-20">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 text-indigo-400 font-black tracking-tight text-lg">
-            <Scale className="w-5 h-5 text-indigo-400" />
-            <span>EMPANEL VIEWER</span>
+      <header className="px-3 sm:px-6 py-2 sm:py-3 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between shadow-md relative z-20">
+        <div className="flex items-center space-x-2 sm:space-x-4">
+          <div className="flex items-center space-x-1.5 sm:space-x-2 text-indigo-400 font-black tracking-tight text-sm sm:text-lg">
+            <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400 shrink-0" />
+            <span>EMPANEL</span>
           </div>
 
           <div className="hidden sm:flex items-center space-x-2 px-3 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-medium text-slate-300">
@@ -163,10 +173,10 @@ export const PodiumView: React.FC = () => {
         </div>
 
         {/* Sync Status Badge & Action Controls */}
-        <div className="flex items-center space-x-2 sm:space-x-3">
-          <div className="flex items-center space-x-2 px-3 py-1 bg-slate-800/80 border border-slate-700/80 rounded-lg text-xs font-mono">
+        <div className="flex items-center space-x-1.5 sm:space-x-3">
+          <div className="flex items-center space-x-1.5 px-2 sm:px-3 py-1 bg-slate-800/80 border border-slate-700/80 rounded-lg text-[11px] sm:text-xs font-mono">
             <span
-              className={`w-2.5 h-2.5 rounded-full ${
+              className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${
                 syncStatus === 'connected_p2p'
                   ? 'bg-emerald-400 animate-pulse'
                   : syncStatus === 'connected_relay'
@@ -176,10 +186,10 @@ export const PodiumView: React.FC = () => {
             />
             <span className="text-slate-300">
               {syncStatus === 'connected_p2p'
-                ? `Connected (Direct)`
+                ? `Direct`
                 : syncStatus === 'connected_relay'
-                ? `Connected (Relay)`
-                : 'Not Connected'}
+                ? `Relay`
+                : 'Offline'}
             </span>
           </div>
 
@@ -266,13 +276,13 @@ export const PodiumView: React.FC = () => {
       )}
 
       {/* Main Jury Pool Gallery Canvas */}
-      <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+      <main className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6 space-y-2.5 sm:space-y-3.5 md:space-y-5">
         {/* Gallery Rows with optional aisle */}
-        <div className="space-y-4">
+        <div className="space-y-2 sm:space-y-2.5 md:space-y-4">
           {rowsData.map((row) => (
-            <div key={row.rowNumber} className="space-y-1.5">
+            <div key={row.rowNumber} className="space-y-1">
 
-              <div className="flex items-stretch gap-3 overflow-x-auto pb-1">
+              <div className="flex items-stretch gap-1 sm:gap-2 md:gap-3 overflow-x-auto pb-1">
                 {(() => {
                   let colOffset = 0;
                   return splits.map((bankWidth, bankIdx) => {
@@ -284,9 +294,11 @@ export const PodiumView: React.FC = () => {
                       <React.Fragment key={bankIdx}>
                         {/* Bank Grid */}
                         <div
-                          className="flex-1 grid gap-3 min-w-[280px]"
+                          className="flex-1 grid gap-1 sm:gap-1.5 md:gap-3 min-w-0 md:min-w-[280px]"
                           style={{
-                            gridTemplateColumns: `repeat(${bankWidth}, minmax(130px, 1fr))`
+                            gridTemplateColumns: isMobile
+                              ? `repeat(${bankWidth}, minmax(0, 1fr))`
+                              : `repeat(${bankWidth}, minmax(130px, 1fr))`
                           }}
                         >
                           {bankJurors.map((juror, cIdx) => {
@@ -294,7 +306,7 @@ export const PodiumView: React.FC = () => {
                               return (
                                 <div
                                   key={`empty-${cIdx}`}
-                                  className="min-h-[160px] border border-dashed border-slate-850 rounded-2xl bg-slate-950/20"
+                                  className="min-h-[46px] sm:min-h-[54px] md:min-h-[160px] border border-dashed border-slate-850 rounded-xl md:rounded-2xl bg-slate-950/20"
                                 />
                               );
                             }
@@ -319,12 +331,12 @@ export const PodiumView: React.FC = () => {
 
                         {/* Center Walkway Aisle */}
                         {!isLastBank && (
-                          <div className="flex flex-col items-center justify-center px-2 select-none">
-                            <div className="h-full border-r-2 border-dashed border-slate-700/50" />
-                            <span className="text-[9px] font-mono tracking-widest text-slate-500 uppercase rotate-90 my-2">
+                          <div className="flex flex-col items-center justify-center px-0.5 sm:px-1 md:px-2 select-none shrink-0">
+                            <div className="h-full border-r border-dashed border-slate-700/60 md:border-r-2 md:border-slate-700/50" />
+                            <span className="hidden md:inline text-[9px] font-mono tracking-widest text-slate-500 uppercase rotate-90 my-2">
                               Aisle
                             </span>
-                            <div className="h-full border-r-2 border-dashed border-slate-700/50" />
+                            <div className="h-full border-r border-dashed border-slate-700/60 md:border-r-2 md:border-slate-700/50" />
                           </div>
                         )}
                       </React.Fragment>

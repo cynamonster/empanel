@@ -229,6 +229,21 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       },
+      onPeerJoined: () => {
+        if (syncSession.getRole() === 'host') {
+          // Re-broadcast state snapshot when additional peers join
+          syncSession.sendMutation({
+            type: 'SNAPSHOT',
+            payload: {
+              activeCase: activeCaseRef.current,
+              jurors: jurorsRef.current,
+              questions: questionsRef.current,
+              causeChallenges: causeChallengesRef.current,
+              peremptoryStrikes: peremptoryStrikesRef.current,
+            },
+          });
+        }
+      },
       onAttemptChange: (current, max) => {
         setSyncAttempts({ current, max });
       },

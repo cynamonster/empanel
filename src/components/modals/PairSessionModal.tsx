@@ -107,13 +107,13 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
 
     if (isOpen && isNowConnected && !wasConnected) {
       setIsSubmitting(false);
-      const timer = setTimeout(() => {
-        if (tab === 'host' || syncRole === 'host') {
-          // Host session confirmation
-        }
-        onClose();
-      }, 350);
-      return () => clearTimeout(timer);
+      // Auto-close for viewer upon connecting; keep host open so additional peers can join
+      if (tab === 'viewer' || syncRole === 'viewer') {
+        const timer = setTimeout(() => {
+          onClose();
+        }, 350);
+        return () => clearTimeout(timer);
+      }
     }
 
     if (isOpen && syncStatus === 'error' && isSubmitting) {
@@ -280,27 +280,28 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
           {tab === 'host' ? (
             /* HOST (Second Chair) */
             <div className="space-y-4">
-              {isConnected ? (
-                /* Connected state */
-                <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-5 text-center space-y-2">
-                  <div className="inline-flex p-3 bg-emerald-500/20 rounded-full text-emerald-400">
-                    <CheckCircle2 className="w-8 h-8" />
-                  </div>
-                  <h3 className="text-sm font-bold text-emerald-200">
-                    Session Connected!
-                  </h3>
-                  <div className="pt-2">
-                    <button
-                      onClick={disconnectSync}
-                      className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-rose-300 border border-slate-750 rounded-lg text-xs font-medium transition-colors"
-                    >
-                      Disconnect Session
-                    </button>
-                  </div>
-                </div>
-              ) : syncPin ? (
-                /* Host PIN Active */
+              {syncPin ? (
+                /* Host PIN Active (Keeps showing PIN and QR even when peers connect) */
                 <div className="space-y-4">
+                  {/* Connected Status Banner */}
+                  {isConnected && (
+                    <div className="bg-emerald-950/50 border border-emerald-500/40 rounded-xl px-4 py-2.5 flex items-center justify-between animate-in fade-in">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-xs font-bold text-emerald-300">
+                          Session Connected & Syncing
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={disconnectSync}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-rose-300 border border-slate-700 rounded-lg text-xs font-medium transition-colors"
+                      >
+                        Disconnect All
+                      </button>
+                    </div>
+                  )}
+
                   <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-5 text-center space-y-3">
                     
                     {/* PIN Display */}
@@ -318,7 +319,9 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
                     </div>
 
                     <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                      Enter this PIN on your phone, or scan the QR code below:
+                      {isConnected
+                        ? 'Share this PIN or QR code to allow additional devices to join this session:'
+                        : 'Enter this PIN on a second device, or scan the QR code below:'}
                     </p>
 
                     {/* QR Code */}
