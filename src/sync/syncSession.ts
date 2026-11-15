@@ -272,6 +272,8 @@ export class SyncSession {
             // Direct 1-step auth verification
             const isValid = await verifyAuthProof(this.cryptoKey, 'empanel-join', msg.proof);
             if (isValid) {
+              this.setStatus('connected_relay');
+              this.startHeartbeat();
               this.sendSignalingMessage({ type: 'AUTH_SUCCESS' });
               this.events.onPeerJoined?.();
               await this.initWebRTC(true);
@@ -320,6 +322,10 @@ export class SyncSession {
             clearInterval(this.joinRetryInterval);
             this.joinRetryInterval = null;
           }
+          // Immediately enter connected_relay state to receive snapshot without 3.5s delay
+          this.setStatus('connected_relay');
+          this.startHeartbeat();
+          this.sendMutation({ type: 'REQUEST_SNAPSHOT' });
           await this.initWebRTC(false);
         }
         break;
