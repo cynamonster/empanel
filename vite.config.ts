@@ -11,10 +11,14 @@ function empanelDevRelayPlugin(): Plugin {
     name: 'empanel-dev-relay',
     configureServer(server) {
       server.ws.on('empanel:signal', (payload: any, client: any) => {
-        // Forward message to all other connected clients
+        // Forward message to all other connected clients safely
         server.ws.clients.forEach((c: any) => {
-          if (c !== client) {
-            c.send('empanel:signal', payload);
+          if (c !== client && c.socket !== client?.socket) {
+            try {
+              c.send('empanel:signal', payload);
+            } catch (e) {
+              // Silently ignore closed or dying client sockets
+            }
           }
         });
       });

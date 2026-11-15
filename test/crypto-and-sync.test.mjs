@@ -229,6 +229,13 @@ async function runTests() {
   assert.strictEqual(roomStatus, 'burned', 'Room must be burned after 3 failed attempts');
   console.log('✅ Test 6 Passed: 3-Attempt Anti-Brute-Force Room Burning Simulation');
 
+  // Test 7: Wi-Fi Insecure Context (Mobile without window.crypto.subtle) Interoperability
+  // Tests that mobile devices connecting over Wi-Fi HTTP (where window.crypto.subtle is undefined)
+  // seamlessly interoperate with the desktop host WebCrypto.
+  const { execSync } = await import('node:child_process');
+  execSync('node /Users/corn-syrup-enjoyer/.gemini/antigravity/brain/f4ea116d-2a0c-49fe-84e7-9b11b9bd5f68/scratch/test-crypto-interop.mjs');
+  console.log('✅ Test 7 Passed: Mobile Wi-Fi HTTP Fallback Interoperability (No SubtleCrypto Required)');
+
   console.log('\n🎉 ALL CRYPTO & SYNC TESTS PASSED SUCCESSFULLY!\n');
 }
 

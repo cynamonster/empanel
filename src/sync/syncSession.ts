@@ -8,6 +8,7 @@ import {
   computeAuthProof,
   verifyAuthProof,
   type EncryptedEnvelope,
+  type EmpanelKey,
 } from './crypto';
 import type { SyncStatus, WhisperMessage } from '../types';
 
@@ -66,6 +67,7 @@ const RTC_CONFIG: RTCConfiguration = {
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
   ],
 };
 
@@ -73,7 +75,7 @@ export class SyncSession {
   private role: SyncRole | null = null;
   private pin: string | null = null;
   private roomId: string | null = null;
-  private cryptoKey: CryptoKey | null = null;
+  private cryptoKey: EmpanelKey | null = null;
   private status: SyncStatus = 'idle';
 
   private failedAttempts: number = 0;
@@ -159,7 +161,7 @@ export class SyncSession {
       this.sendSignalingMessage({ type: 'PEER_JOIN', role: 'viewer' });
       let attempts = 0;
       this.joinRetryInterval = setInterval(() => {
-        if (this.status !== 'joining' || attempts++ >= 6) {
+        if (this.status !== 'joining' || attempts++ >= 30) {
           if (this.joinRetryInterval) clearInterval(this.joinRetryInterval);
           return;
         }
@@ -471,7 +473,7 @@ export class SyncSession {
         };
       }
 
-      // Fallback timeout: If direct P2P dataChannel takes >2.5s, fall back to E2EE Relay
+      // Fallback timeout: If direct P2P dataChannel takes >4s, fall back to E2EE Relay
       setTimeout(() => {
         if (this.status === 'hosting' || this.status === 'joining') {
           this.setStatus('connected_relay');
@@ -480,7 +482,7 @@ export class SyncSession {
             this.sendMutation({ type: 'REQUEST_SNAPSHOT' });
           }
         }
-      }, 2500);
+      }, 4000);
     } catch (err: any) {
       console.warn('WebRTC init failed, using E2EE relay', err);
       this.setStatus('connected_relay');
