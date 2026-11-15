@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useCase } from '../../context/CaseContext';
 import { formatPin, normalizePin, isValidPin } from '../../sync/crypto';
+import { generateQrSvgPath } from '../../utils/qrCode';
 import {
   ShieldCheck,
-  Flame,
   Radio,
   Laptop,
   CheckCircle2,
@@ -14,7 +14,8 @@ import {
   X,
   Wifi,
   Lock,
-  ArrowRight
+  ArrowRight,
+  QrCode
 } from 'lucide-react';
 
 interface PairSessionModalProps {
@@ -43,6 +44,8 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
   const [tab, setTab] = useState<'host' | 'viewer'>(initialTab);
   const [inputPin, setInputPin] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const [lanIp, setLanIp] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -61,7 +64,37 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // For host session: alert when connected and automatically close the modal
+  // Discover LAN IP from dev/preview server when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      fetch('/api/lan-ip')
+        .then(res => res.json())
+        .then(data => {
+          if (data?.ip) setLanIp(data.ip);
+        })
+        .catch(() => {
+          // Dev API endpoint not available in static CDN mode, fallback silently
+        });
+    }
+  }, [isOpen]);
+
+  // Compute mobile join URL and QR Code SVG path
+  const mobileJoinUrl = useMemo(() => {
+    if (!syncPin) return '';
+    const hostname = window.location.hostname;
+    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+    const targetHost = (isLocal && lanIp)
+      ? `${lanIp}${window.location.port ? `:${window.location.port}` : ''}`
+      : window.location.host;
+    return `${window.location.protocol}//${targetHost}/?join=${syncPin}`;
+  }, [syncPin, lanIp]);
+
+  const qrData = useMemo(() => {
+    if (!mobileJoinUrl) return null;
+    return generateQrSvgPath(mobileJoinUrl);
+  }, [mobileJoinUrl]);
+
+  // Automatically close modal when connection succeeds
   useEffect(() => {
     if (isOpen) {
       prevStatusRef.current = syncStatus;
@@ -72,16 +105,34 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
     const wasConnected = prevStatusRef.current === 'connected_p2p' || prevStatusRef.current === 'connected_relay';
     const isNowConnected = syncStatus === 'connected_p2p' || syncStatus === 'connected_relay';
 
-    if (isOpen && (tab === 'host' || syncRole === 'host') && isNowConnected && !wasConnected) {
+    if (isOpen && isNowConnected && !wasConnected) {
+      setIsSubmitting(false);
       const timer = setTimeout(() => {
-        alert('Podium session linked successfully!');
+        if (tab === 'host' || syncRole === 'host') {
+          // Host session confirmation
+        }
         onClose();
-      }, 150);
+      }, 350);
       return () => clearTimeout(timer);
     }
 
+    if (isOpen && syncStatus === 'error' && isSubmitting) {
+      setIsSubmitting(false);
+      setErrorMessage('Connection failed. Please check the PIN and ensure the host is running.');
+    }
+
     prevStatusRef.current = syncStatus;
-  }, [isOpen, tab, syncRole, syncStatus, onClose]);
+  }, [isOpen, tab, syncRole, syncStatus, isSubmitting, onClose]);
+
+  // Safety timeout for join requests
+  useEffect(() => {
+    if (!isSubmitting) return;
+    const timeout = setTimeout(() => {
+      setIsSubmitting(false);
+      setErrorMessage('Connection timed out. Ensure the Second Chair host is running and on the same Wi-Fi.');
+    }, 15000);
+    return () => clearTimeout(timeout);
+  }, [isSubmitting]);
 
   // Initialize tab & auto-generate host PIN if opening in host mode without one
   useEffect(() => {
@@ -140,11 +191,10 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
     setErrorMessage(null);
     try {
       await joinSyncSession(clean);
-      onClose();
+      // Let the isNowConnected effect auto-close the modal upon handshake completion
     } catch (e: any) {
-      setErrorMessage(e?.message || 'Failed to connect with Second Chair');
-    } finally {
       setIsSubmitting(false);
+      setErrorMessage(e?.message || 'Failed to connect with Second Chair');
     }
   };
 
@@ -155,8 +205,14 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleCopyUrl = () => {
+    if (!mobileJoinUrl) return;
+    navigator.clipboard.writeText(mobileJoinUrl);
+    setCopiedUrl(true);
+    setTimeout(() => setCopiedUrl(false), 2000);
+  };
+
   const isConnected = syncStatus === 'connected_p2p' || syncStatus === 'connected_relay';
-  const isBurned = syncStatus === 'burned' || syncAttempts.current >= syncAttempts.max;
 
   return (
     <div
@@ -164,12 +220,12 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-slate-900 border border-slate-750 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200"
+        className="bg-slate-900 border border-slate-750 w-full max-w-lg max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
         
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
               <Radio className="w-5 h-5 animate-pulse" />
@@ -177,9 +233,6 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
             <div>
               <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
                 Session Sync
-                {/* <span className="text-[10px] uppercase tracking-wider font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold flex items-center gap-1">
-                  <Lock className="w-3 h-3" /> Secured
-                </span> */}
               </h2>
               <p className="text-xs text-slate-400">
                 Allow others to join your session
@@ -195,7 +248,7 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
         </div>
 
         {/* Tab Selection */}
-        <div className="flex border-b border-slate-800 bg-slate-950/40 p-1.5 gap-1.5">
+        <div className="flex border-b border-slate-800 bg-slate-950/40 p-1.5 gap-1.5 flex-shrink-0">
           <button
             type="button"
             onClick={handleSelectHostTab}
@@ -223,7 +276,7 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
         </div>
 
         {/* Tab Content */}
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-5 overflow-y-auto">
           {tab === 'host' ? (
             /* HOST (Second Chair) */
             <div className="space-y-4">
@@ -245,61 +298,85 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
                     </button>
                   </div>
                 </div>
-              ) : isBurned ? (
-                /* Room burned lockout state */
-                <div className="bg-rose-950/40 border border-rose-500/40 rounded-xl p-5 text-center space-y-3">
-                  <div className="inline-flex p-3 bg-rose-500/20 rounded-full text-rose-400">
-                    <Flame className="w-8 h-8" />
-                  </div>
-                  <h3 className="text-sm font-bold text-rose-200">
-                    Room Burned (Security Lockout)
-                  </h3>
-                  <p className="text-xs text-slate-300 max-w-sm mx-auto">
-                    3 failed attempts occurred. To prevent brute-force attacks, this room was destroyed. Click below to generate a new PIN.
-                  </p>
-                  <button
-                    onClick={handleGenerateFreshPin}
-                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2 mx-auto"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    <span>Generate Fresh PIN</span>
-                  </button>
-                </div>
               ) : syncPin ? (
                 /* Host PIN Active */
                 <div className="space-y-4">
-                  <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-6 text-center space-y-3">
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-5 text-center space-y-3">
                     
                     {/* PIN Display */}
                     <div className="flex items-center justify-center gap-3">
-                      <div className="font-mono text-4xl font-black tracking-widest text-indigo-300 bg-slate-900 border-2 border-indigo-500/40 px-6 py-3 rounded-2xl shadow-inner select-all">
+                      <div className="font-mono text-3xl font-black tracking-widest text-indigo-300 bg-slate-900 border-2 border-indigo-500/40 px-5 py-2.5 rounded-2xl shadow-inner select-all">
                         {formatPin(syncPin)}
                       </div>
                       <button
                         onClick={handleCopyPin}
                         title="Copy PIN"
-                        className="p-3.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 hover:text-white rounded-2xl transition-colors shadow"
+                        className="p-3 bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 hover:text-white rounded-xl transition-colors shadow"
                       >
                         {copied ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5" />}
                       </button>
                     </div>
 
                     <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                      Enter this PIN on a second device to link sessions.
+                      Enter this PIN on your phone, or scan the QR code below:
                     </p>
+
+                    {/* QR Code */}
+                    {qrData && (
+                      <div className="pt-2 flex flex-col items-center gap-2.5">
+                        <div className="bg-white p-3 rounded-2xl shadow-lg border border-slate-700/50">
+                          <svg
+                            viewBox={`0 0 ${qrData.size} ${qrData.size}`}
+                            className="w-36 h-36"
+                            shapeRendering="crispEdges"
+                          >
+                            <path d={qrData.path} fill="#0f172a" />
+                          </svg>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
+                          <QrCode className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Scan with Phone Camera to Auto-Join</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Mobile Join URL */}
+                    {mobileJoinUrl && (
+                      <div className="flex flex-col gap-1.5 w-full mt-2">
+                        <div className="flex items-center gap-2 bg-slate-900 border border-slate-850 rounded-xl px-3 py-1.5 text-left">
+                          <span className="text-[11px] font-mono text-slate-300 truncate flex-1 select-all">
+                            {mobileJoinUrl}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleCopyUrl}
+                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-indigo-300 hover:text-indigo-200 border border-slate-700 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 shrink-0"
+                          >
+                            {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedUrl ? 'Copied' : 'Copy'}</span>
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-400 text-center">
+                          {window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                            ? 'Local dev mode: phone must be on the same Wi-Fi. (In production on empanel.app, connects over any network)'
+                            : 'Open this link or visit empanel.app and enter the PIN'}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex items-center justify-between text-xs px-1">
+                  <div className="flex items-center justify-between text-xs px-1 text-slate-400">
                     <span className="text-indigo-300 flex items-center gap-2">
                       <Wifi className="w-4 h-4 text-indigo-400 animate-pulse" />
-                      Listening for Connection...
+                      Listening for connections...
                     </span>
                     <button
-                      onClick={burnSyncRoom}
-                      className="text-slate-400 hover:text-rose-400 font-medium flex items-center gap-1 hover:underline text-xs transition-colors"
+                      type="button"
+                      onClick={handleGenerateFreshPin}
+                      className="text-slate-400 hover:text-indigo-300 font-medium flex items-center gap-1 hover:underline text-xs transition-colors"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Regenerate PIN</span>
+                      <span>Generate New PIN</span>
                     </button>
                   </div>
                 </div>
@@ -333,7 +410,7 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
                   className="w-full px-4 py-3 bg-slate-950 border-2 border-slate-700 focus:border-amber-500 rounded-xl font-mono text-center text-3xl tracking-widest text-amber-300 focus:outline-none focus:ring-4 focus:ring-amber-500/20"
                 />
                 <p className="text-xs text-slate-400 text-center">
-                  Look at the Second Chair screen to find the 6-character PIN.
+                  Look at the Second Chair screen to find the 6-character PIN or scan the QR code.
                 </p>
               </div>
 

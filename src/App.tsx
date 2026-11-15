@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CaseProvider, useCase } from './context/CaseContext';
 import { Navbar } from './components/layout/Navbar';
 import { SeatingBoxView } from './components/seating/SeatingBoxView';
@@ -11,9 +11,10 @@ import { NewCaseModal } from './components/modals/NewCaseModal';
 import { PairSessionModal } from './components/modals/PairSessionModal';
 import { PodiumView } from './components/podium/PodiumView';
 import { WhisperInputBar } from './components/podium/WhisperInputBar';
+import { normalizePin, isValidPin } from './sync/crypto';
 
 const CourtroomWorkspace: React.FC = () => {
-  const { viewMode, syncRole, syncStatus } = useCase();
+  const { viewMode, syncRole, syncStatus, joinSyncSession } = useCase();
 
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
   const [isStrikeConsoleOpen, setIsStrikeConsoleOpen] = useState(false);
@@ -21,6 +22,24 @@ const CourtroomWorkspace: React.FC = () => {
   const [isNewCaseOpen, setIsNewCaseOpen] = useState(false);
   const [isPairOpen, setIsPairOpen] = useState(false);
   const [pairModalTab, setPairModalTab] = useState<'host' | 'viewer'>('host');
+
+  // Auto-connect if URL contains ?join=PIN or ?pin=PIN
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const joinPin = params.get('join') || params.get('pin');
+      if (joinPin && syncRole !== 'host') {
+        const clean = normalizePin(joinPin);
+        if (isValidPin(clean)) {
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, '', newUrl);
+          joinSyncSession(clean).catch(err => {
+            console.error('Auto-join from URL failed', err);
+          });
+        }
+      }
+    } catch (e) {}
+  }, []);
 
   const handleOpenPairModal = (tab: 'host' | 'viewer' = 'host') => {
     setPairModalTab(tab);

@@ -194,40 +194,21 @@ async function runTests() {
   assert.strictEqual(isImposterAuthorized, false, 'Imposter proof must fail verification');
   console.log('✅ Test 5 Passed: Auth Challenge-Proof Handshake Protocol');
 
-  // Test 6: 3-Attempt Anti-Brute-Force Room Burning Simulation
-  let failedAttempts = 0;
-  const maxAttempts = 3;
-  let roomStatus = 'hosting';
+  // Test 6: Non-Destructive Auth & Infinite Retry (No Room Burning)
+  const genuineProof = await computeAuthProof(viewerKey, 'empanel-join');
+  const badProof = await computeAuthProof(imposterKey, 'empanel-join');
 
-  function onAttempt(pinGuess) {
-    if (pinGuess === hostPin) {
-      failedAttempts = 0;
-      roomStatus = 'connected';
-      return true;
-    } else {
-      failedAttempts += 1;
-      if (failedAttempts >= maxAttempts) {
-        roomStatus = 'burned';
-      }
-      return false;
-    }
-  }
+  // Bad attempt: fails verification, but host remains hosting
+  assert.strictEqual(await verifyAuthProof(hostKey, 'empanel-join', badProof), false, 'Imposter proof must fail');
+  
+  // Multiple bad attempts: host stays active, no room burning!
+  assert.strictEqual(await verifyAuthProof(hostKey, 'empanel-join', badProof), false);
+  assert.strictEqual(await verifyAuthProof(hostKey, 'empanel-join', badProof), false);
+  assert.strictEqual(await verifyAuthProof(hostKey, 'empanel-join', badProof), false);
 
-  // Attempt 1: wrong PIN
-  assert.strictEqual(onAttempt('BAD001'), false);
-  assert.strictEqual(failedAttempts, 1);
-  assert.strictEqual(roomStatus, 'hosting');
-
-  // Attempt 2: wrong PIN
-  assert.strictEqual(onAttempt('BAD002'), false);
-  assert.strictEqual(failedAttempts, 2);
-  assert.strictEqual(roomStatus, 'hosting');
-
-  // Attempt 3: wrong PIN -> triggers BURN_ROOM
-  assert.strictEqual(onAttempt('BAD003'), false);
-  assert.strictEqual(failedAttempts, 3);
-  assert.strictEqual(roomStatus, 'burned', 'Room must be burned after 3 failed attempts');
-  console.log('✅ Test 6 Passed: 3-Attempt Anti-Brute-Force Room Burning Simulation');
+  // Subsequent correct attempt succeeds seamlessly
+  assert.strictEqual(await verifyAuthProof(hostKey, 'empanel-join', genuineProof), true, 'Genuine viewer can join after failed attempts');
+  console.log('✅ Test 6 Passed: Non-Destructive Auth & Infinite Retry (Room Burn Removed)');
 
   // Test 7: Wi-Fi Insecure Context (Mobile without window.crypto.subtle) Interoperability
   // Tests that mobile devices connecting over Wi-Fi HTTP (where window.crypto.subtle is undefined)

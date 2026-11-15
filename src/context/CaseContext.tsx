@@ -213,9 +213,6 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     syncSession.setEvents({
       onStatusChange: (status) => {
         setSyncStatus(status);
-        if (status === 'burned') {
-          clearSavedViewerPin().catch(() => {});
-        }
         if (status === 'connected_p2p' || status === 'connected_relay') {
           if (syncSession.getRole() === 'host') {
             // Broadcast initial state snapshot to the newly paired viewer
@@ -912,10 +909,8 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const burnSyncRoom = () => {
-    clearSavedViewerPin().catch(() => {});
-    syncSession.burnRoom();
-    setSyncPin(null);
-    setSyncAttempts({ current: 3, max: 3 });
+    // Deprecated alias for disconnectSync
+    disconnectSync();
   };
 
   const disconnectSync = () => {

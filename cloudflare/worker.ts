@@ -3,7 +3,9 @@
 // ZERO plaintext data touches this worker; payloads are opaque AES-256-GCM ciphertext.
 
 export interface Env {
-  // Durable Object binding if using DOs, or in-memory room map for ephemeral sessions
+  ASSETS?: {
+    fetch: (request: Request) => Promise<Response>;
+  };
 }
 
 interface PeerConnection {
@@ -97,6 +99,10 @@ export default {
       server.addEventListener('error', cleanup);
 
       return new Response(null, { status: 101, webSocket: client });
+    }
+
+    if (env.ASSETS) {
+      return env.ASSETS.fetch(request);
     }
 
     return new Response('Empanel E2EE Relay Online', { status: 200 });

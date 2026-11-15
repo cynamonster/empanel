@@ -41,11 +41,11 @@ export type SyncMutation =
   | { type: 'PONG'; timestamp: number };
 
 type SignalingMessage =
-  | { type: 'PEER_JOIN'; role: SyncRole }
+  | { type: 'PEER_JOIN'; role: SyncRole; proof?: string }
   | { type: 'AUTH_CHALLENGE'; challenge: string }
   | { type: 'AUTH_PROOF'; proof: string }
   | { type: 'AUTH_SUCCESS' }
-  | { type: 'AUTH_FAIL'; attempt: number; maxAttempts: number }
+  | { type: 'AUTH_FAIL'; message?: string }
   | { type: 'BURN_ROOM' }
   | { type: 'WEBRTC_OFFER'; sdp: EncryptedEnvelope }
   | { type: 'WEBRTC_ANSWER'; sdp: EncryptedEnvelope }
@@ -76,10 +76,8 @@ export class SyncSession {
   private pin: string | null = null;
   private roomId: string | null = null;
   private cryptoKey: EmpanelKey | null = null;
+  private authProof: string | null = null;
   private status: SyncStatus = 'idle';
-
-  private failedAttempts: number = 0;
-  private readonly maxAttempts: number = 3;
 
   private bc: BroadcastChannel | null = null;
   private ws: WebSocket | null = null;
@@ -114,7 +112,7 @@ export class SyncSession {
   }
 
   public getFailedAttempts(): { current: number; max: number } {
-    return { current: this.failedAttempts, max: this.maxAttempts };
+    return { current: 0, max: 0 };
   }
 
   private setStatus(newStatus: SyncStatus) {
@@ -129,13 +127,11 @@ export class SyncSession {
     this.cleanup();
     this.role = 'host';
     this.pin = pin;
-    this.failedAttempts = 0;
     this.setStatus('hosting');
 
     try {
       this.roomId = await deriveRoomId(pin);
       this.cryptoKey = await deriveKeyFromPin(pin);
-      this.events.onAttemptChange?.(0, this.maxAttempts);
       this.initSignaling();
     } catch (err: any) {
       this.setStatus('error');
@@ -155,18 +151,25 @@ export class SyncSession {
     try {
       this.roomId = await deriveRoomId(pin);
       this.cryptoKey = await deriveKeyFromPin(pin);
+      this.authProof = await computeAuthProof(this.cryptoKey, 'empanel-join');
       this.initSignaling();
 
-      // Announce presence immediately and retry periodically until challenge received
-      this.sendSignalingMessage({ type: 'PEER_JOIN', role: 'viewer' });
+      // Announce presence immediately and retry periodically until handshake completes
+      const sendJoin = () => {
+        if (this.status === 'joining' && this.authProof) {
+          this.sendSignalingMessage({ type: 'PEER_JOIN', role: 'viewer', proof: this.authProof });
+        }
+      };
+
+      sendJoin();
       let attempts = 0;
       this.joinRetryInterval = setInterval(() => {
         if (this.status !== 'joining' || attempts++ >= 30) {
           if (this.joinRetryInterval) clearInterval(this.joinRetryInterval);
           return;
         }
-        this.sendSignalingMessage({ type: 'PEER_JOIN', role: 'viewer' });
-      }, 700);
+        sendJoin();
+      }, 1000);
     } catch (err: any) {
       this.setStatus('error');
       this.events.onError?.(err?.message || 'Failed to initialize session encryption');
@@ -196,11 +199,16 @@ export class SyncSession {
       console.warn('BroadcastChannel not supported in this environment');
     }
 
-    // 3. Connect to WebSocket signaling relay (Cloudflare Worker or fallback)
+    // 3. Connect to WebSocket signaling relay (Dedicated endpoint for LAN & Internet)
     const relayUrl = (window as any).__EMPANEL_RELAY_URL__ || this.getRelayUrl();
     if (relayUrl) {
       try {
         this.ws = new WebSocket(`${relayUrl}?room=${this.roomId}&role=${this.role}`);
+        this.ws.onopen = () => {
+          if (this.role === 'viewer' && this.status === 'joining' && this.authProof) {
+            this.sendSignalingMessage({ type: 'PEER_JOIN', role: 'viewer', proof: this.authProof });
+          }
+        };
         this.ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
@@ -221,60 +229,67 @@ export class SyncSession {
   }
 
   private getRelayUrl(): string | null {
-    // If running in development Vite, Vite HMR plugin handles it via import.meta.hot!
-    if ((import.meta as any).hot) {
-      return null;
-    }
-    // Production Cloudflare Worker WebSocket relay endpoint
+    const customRelay = (window as any).__EMPANEL_RELAY_URL__;
+    if (customRelay) return customRelay;
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${window.location.host}/api/relay`;
   }
 
   private sendSignalingMessage(msg: SignalingMessage) {
-    // 1. Vite HMR bus (cross-computer on LAN in dev)
-    const hot = (import.meta as any).hot;
-    if (hot) {
+    let sentViaWs = false;
+    // 1. WebSocket relay (primary backbone across Wi-Fi & Internet)
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       try {
-        hot.send('empanel:signal', { roomId: this.roomId, msg });
-      } catch (e) {}
+        this.ws.send(JSON.stringify(msg));
+        sentViaWs = true;
+      } catch (err) {}
     }
 
-    // 2. BroadcastChannel (same browser)
+    // 2. BroadcastChannel for same-browser cross-tab testing
     if (this.bc) {
       try {
         this.bc.postMessage(msg);
       } catch (err) {}
     }
 
-    // 3. WebSocket relay
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      try {
-        this.ws.send(JSON.stringify(msg));
-      } catch (err) {}
+    // 3. Vite HMR bus companion (only when dedicated WS relay is not connected)
+    if (!sentViaWs) {
+      const hot = (import.meta as any).hot;
+      if (hot) {
+        try {
+          hot.send('empanel:signal', { roomId: this.roomId, msg });
+        } catch (e) {}
+      }
     }
   }
 
   private async handleSignalingMessage(msg: SignalingMessage) {
-    if (this.status === 'burned') return;
-
     switch (msg.type) {
       case 'PEER_JOIN':
-        if (this.role === 'host') {
-          // Send auth challenge to the newly joined peer
-          this.currentAuthChallenge = createAuthChallenge();
-          this.sendSignalingMessage({
-            type: 'AUTH_CHALLENGE',
-            challenge: this.currentAuthChallenge,
-          });
+        if (this.role === 'host' && this.cryptoKey) {
+          if (msg.proof) {
+            // Direct 1-step auth verification
+            const isValid = await verifyAuthProof(this.cryptoKey, 'empanel-join', msg.proof);
+            if (isValid) {
+              this.sendSignalingMessage({ type: 'AUTH_SUCCESS' });
+              await this.initWebRTC(true);
+            } else {
+              // Wrong PIN on viewer - inform viewer without burning room
+              this.sendSignalingMessage({ type: 'AUTH_FAIL', message: 'Incorrect PIN' });
+            }
+          } else {
+            // Legacy 2-step challenge fallback
+            this.currentAuthChallenge = createAuthChallenge();
+            this.sendSignalingMessage({
+              type: 'AUTH_CHALLENGE',
+              challenge: this.currentAuthChallenge,
+            });
+          }
         }
         break;
 
       case 'AUTH_CHALLENGE':
         if (this.role === 'viewer' && this.cryptoKey) {
-          if (this.joinRetryInterval) {
-            clearInterval(this.joinRetryInterval);
-            this.joinRetryInterval = null;
-          }
           const proof = await computeAuthProof(this.cryptoKey, msg.challenge);
           this.sendSignalingMessage({ type: 'AUTH_PROOF', proof });
         }
@@ -289,48 +304,39 @@ export class SyncSession {
           );
 
           if (isValid) {
-            this.failedAttempts = 0;
-            this.events.onAttemptChange?.(0, this.maxAttempts);
             this.sendSignalingMessage({ type: 'AUTH_SUCCESS' });
             await this.initWebRTC(true);
           } else {
-            this.failedAttempts += 1;
-            this.events.onAttemptChange?.(this.failedAttempts, this.maxAttempts);
-
-            if (this.failedAttempts >= this.maxAttempts) {
-              this.burnRoom();
-            } else {
-              this.sendSignalingMessage({
-                type: 'AUTH_FAIL',
-                attempt: this.failedAttempts,
-                maxAttempts: this.maxAttempts,
-              });
-            }
+            this.sendSignalingMessage({ type: 'AUTH_FAIL', message: 'Incorrect PIN' });
           }
         }
         break;
 
       case 'AUTH_SUCCESS':
         if (this.role === 'viewer') {
+          if (this.joinRetryInterval) {
+            clearInterval(this.joinRetryInterval);
+            this.joinRetryInterval = null;
+          }
           await this.initWebRTC(false);
         }
         break;
 
       case 'AUTH_FAIL':
         if (this.role === 'viewer') {
-          this.events.onError?.(
-            `Incorrect PIN (Attempt ${msg.attempt} of ${msg.maxAttempts})`
-          );
+          if (this.joinRetryInterval) {
+            clearInterval(this.joinRetryInterval);
+            this.joinRetryInterval = null;
+          }
+          this.setStatus('error');
+          this.events.onError?.('Incorrect PIN. Please re-enter the 6-character PIN from the host screen.');
         }
         break;
 
       case 'BURN_ROOM':
-        this.status = 'burned';
-        this.setStatus('burned');
-        this.events.onError?.(
-          'Room burned due to excessive failed attempts. Please request a new PIN.'
-        );
+        // Ditch room burn: gracefully disconnect if received
         this.cleanupConnections();
+        this.setStatus('disconnected');
         break;
 
       case 'WEBRTC_OFFER':
@@ -473,16 +479,22 @@ export class SyncSession {
         };
       }
 
-      // Fallback timeout: If direct P2P dataChannel takes >4s, fall back to E2EE Relay
+      // Fallback timeout: If direct P2P dataChannel takes >3.5s, fall back to E2EE Relay
       setTimeout(() => {
         if (this.status === 'hosting' || this.status === 'joining') {
           this.setStatus('connected_relay');
           this.startHeartbeat();
           if (this.role === 'viewer') {
             this.sendMutation({ type: 'REQUEST_SNAPSHOT' });
+            // Snapshot retry safeguard after 1.5s
+            setTimeout(() => {
+              if (this.role === 'viewer' && (this.status === 'connected_relay' || this.status === 'connected_p2p')) {
+                this.sendMutation({ type: 'REQUEST_SNAPSHOT' });
+              }
+            }, 1500);
           }
         }
-      }, 4000);
+      }, 3500);
     } catch (err: any) {
       console.warn('WebRTC init failed, using E2EE relay', err);
       this.setStatus('connected_relay');
@@ -514,6 +526,12 @@ export class SyncSession {
       if (this.role === 'viewer') {
         // Request initial full state snapshot
         this.sendMutation({ type: 'REQUEST_SNAPSHOT' });
+        // Snapshot retry safeguard after 1.5s
+        setTimeout(() => {
+          if (this.role === 'viewer' && (this.status === 'connected_p2p' || this.status === 'connected_relay')) {
+            this.sendMutation({ type: 'REQUEST_SNAPSHOT' });
+          }
+        }, 1500);
       }
     };
 
@@ -598,15 +616,10 @@ export class SyncSession {
   }
 
   /**
-   * Burns the room after 3 failed attempts or when triggered by Second Chair.
+   * Resets and disconnects the session (replaces legacy room burn).
    */
   public burnRoom() {
-    this.sendSignalingMessage({ type: 'BURN_ROOM' });
-    this.status = 'burned';
-    this.setStatus('burned');
-    this.events.onAttemptChange?.(this.maxAttempts, this.maxAttempts);
-    this.events.onError?.('Room burned. Security lockout active.');
-    this.cleanupConnections();
+    this.cleanup();
   }
 
   private cleanupConnections() {
@@ -651,8 +664,8 @@ export class SyncSession {
     this.pin = null;
     this.roomId = null;
     this.cryptoKey = null;
+    this.authProof = null;
     this.currentAuthChallenge = null;
-    this.failedAttempts = 0;
     this.status = 'idle';
   }
 }
