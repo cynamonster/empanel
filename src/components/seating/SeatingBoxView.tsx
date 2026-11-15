@@ -448,6 +448,27 @@ export const SeatingBoxView: React.FC = () => {
 
           {/* Sequential Panel Prefill & Auto-refill Controls */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Conditional Prefill or Clear Panel Button (mutually exclusive) */}
+            {seatedMap.size > 0 || alternateMap.size > 0 ? (
+              <button
+                onClick={() => clearPanel()}
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-rose-950/60 hover:border-rose-700/80 hover:text-rose-300 text-slate-300 border border-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all"
+                title="Clear all seated jurors from the Prospective Panel and return them to the unseated pool"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>Clear Panel</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => prefillSequentialPanel(autoFillEnabled)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow transition-colors"
+                title="Pre-fill Prospective Panel with sequential unstruck jurors (Jurors 1, 2, ...)"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-200" />
+                <span>Prefill Panel</span>
+              </button>
+            )}
+
             {/* Auto-fill Toggle */}
             <button
               onClick={toggleAutoFillPanel}
@@ -459,28 +480,7 @@ export const SeatingBoxView: React.FC = () => {
               title="When enabled, if any seated panel juror is struck, remaining jurors slide and replacements are automatically pulled in!"
             >
               <Zap className={`w-3.5 h-3.5 ${autoFillEnabled ? 'text-amber-400 fill-amber-400' : 'text-slate-500'}`} />
-              <span>Auto-Pull Replacements: {autoFillEnabled ? 'ON' : 'OFF'}</span>
-            </button>
-
-            {/* Instant Prefill Sequential Button */}
-            <button
-              onClick={() => prefillSequentialPanel(autoFillEnabled)}
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow transition-colors"
-              title="Pre-fill Prospective Panel with sequential unstruck jurors (Jurors 1, 2, ...)"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-200" />
-              <span>Prefill Sequential Panel</span>
-            </button>
-
-            {/* Clear Prospective Jury Panel Button */}
-            <button
-              onClick={() => clearPanel()}
-              disabled={seatedMap.size === 0 && alternateMap.size === 0}
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-rose-950/60 hover:border-rose-700/80 hover:text-rose-300 text-slate-300 border border-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all disabled:opacity-40 disabled:hover:bg-slate-800 disabled:hover:border-slate-700 disabled:hover:text-slate-300 disabled:cursor-not-allowed"
-              title="Clear all seated jurors from the Prospective Panel and return them to the unseated pool"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-              <span>Clear Panel</span>
+              <span>Auto-Fill Panel: {autoFillEnabled ? 'ON' : 'OFF'}</span>
             </button>
           </div>
         </div>

@@ -62,9 +62,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   const dRemaining = Math.max(0, (activeCase?.defenseStrikesAllowed || 3) - defenseStrikesUsed);
 
   return (
-    <header data-navbar="true" className="bg-slate-900 border-b border-slate-800 text-slate-100 px-4 py-2.5 flex items-center justify-between shadow-md relative z-30">
+    <header data-navbar="true" className="bg-slate-900 border-b border-slate-800 text-slate-100 px-2 sm:px-4 py-2.5 flex items-center justify-between shadow-md relative z-30">
       {/* Brand & Case Selector */}
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
         <div className="flex items-center space-x-2 text-indigo-400 font-bold tracking-tight text-lg">
           <div className="p-1.5 bg-indigo-500/20 border border-indigo-500/30 rounded-lg">
             <Scale className="w-5 h-5 text-indigo-400" />
@@ -74,8 +74,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </span>
         </div>
 
-        {/* Case Dropdown */}
-        <div className="relative">
+        {/* Case Dropdown (Hidden on mobile screen sizes) */}
+        <div className="relative hidden sm:block">
           <button
             onClick={() => setShowCaseMenu(!showCaseMenu)}
             className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-sm font-medium transition-colors"
@@ -142,9 +142,9 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Center/Right Action Toolbar */}
-      <div className="flex items-center space-x-2 md:space-x-3">
+      <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3 overflow-x-auto min-w-0">
         {/* Undo & Redo History Controls */}
-        <div className="flex items-center space-x-0.5 bg-slate-800 p-0.5 rounded-lg border border-slate-700">
+        <div className="flex items-center space-x-0.5 bg-slate-800 p-0.5 rounded-lg border border-slate-700 flex-shrink-0">
           <Tooltip content="Undo (Ctrl+Z / ⌘Z)" side="bottom">
             <button
               disabled={!canUndo}
@@ -171,12 +171,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* <Tooltip content="Open Strategic Strike Console" side="bottom"> */}
           <button
             // onClick={onOpenStrikeConsole}
-            className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-xs transition-colors"
+            className="flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-xs transition-colors flex-shrink-0"
             // title="Open Strategic Strike Console"
             style={{ cursor: 'default' }}
           >
             <Gavel className="w-3.5 h-3.5 text-amber-400" />
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1.5 sm:space-x-2">
               <span className="font-semibold text-slate-300 hidden md:inline">Strikes:</span>
               <span
                 className="text-rose-400 font-mono font-medium"
@@ -203,7 +203,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               setActiveQuestionId('new');
             }
           }}
-          className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+          className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors flex-shrink-0 ${
             activeQuestionId
               ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 ring-2 ring-amber-500/30 animate-pulse'
               : 'bg-slate-800 hover:bg-slate-750 border-slate-700 text-slate-300'
@@ -219,11 +219,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           </span>
         </button>
 
-        {/* E2EE Podium Session Linker Button */}
+        {/* E2EE Podium Session Linker / Sync Button */}
         {syncStatus === 'connected_p2p' || syncStatus === 'connected_relay' ? (
           <button
             onClick={() => onOpenPairModal()}
-            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs border border-emerald-500/50 bg-emerald-500/20 text-emerald-300 transition-colors"
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs border border-emerald-500/50 bg-emerald-500/20 text-emerald-300 transition-colors flex-shrink-0"
             title="E2EE Session Active (Click to manage)"
           >
             <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
@@ -234,8 +234,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         ) : (
           <button
             onClick={() => onOpenPairModal()}
-            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 transition-colors"
-            title="E2EE Podium Linking"
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 transition-colors flex-shrink-0"
+            title="E2EE Podium Linking / Sync"
           >
             <Radio className="w-3.5 h-3.5 text-slate-400" />
             <span>Pair</span>
@@ -245,7 +245,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Roster Intake Button */}
         <button
           onClick={onOpenIntake}
-          className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all ${
+          className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all flex-shrink-0 ${
             jurors.length === 0
               ? 'bg-emerald-600 hover:bg-emerald-500 text-white font-bold border border-emerald-400 ring-2 ring-emerald-400/50 shadow-lg shadow-emerald-900/40 animate-pulse'
               : 'bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300'
@@ -261,7 +261,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={async () => {
             await loadDemoCase();
           }}
-          className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-gradient-to-r from-amber-500/20 to-indigo-500/20 hover:from-amber-500/30 hover:to-indigo-500/30 border border-amber-500/40 hover:border-amber-400 text-amber-200 rounded-lg text-xs font-semibold shadow-sm transition-all"
+          className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-gradient-to-r from-amber-500/20 to-indigo-500/20 hover:from-amber-500/30 hover:to-indigo-500/30 border border-amber-500/40 hover:border-amber-400 text-amber-200 rounded-lg text-xs font-semibold shadow-sm transition-all flex-shrink-0"
           title="Load pre-configured 6-juror criminal demo trial (32 pool jurors, questions, strikes, and cause challenge)"
         >
           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -271,7 +271,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Case Settings Button */}
         <button
           onClick={onOpenSettings}
-          className="p-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
+          className="p-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-slate-400 hover:text-slate-200 transition-colors flex-shrink-0"
           title="Case & Layout Settings"
         >
           <Settings className="w-4 h-4" />
