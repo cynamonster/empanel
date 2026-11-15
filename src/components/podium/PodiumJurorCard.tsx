@@ -22,31 +22,41 @@ export const PodiumJurorCard: React.FC<PodiumJurorCardProps> = ({
   const currentResponse = activeQuestionId ? juror.responses?.[activeQuestionId] : undefined;
   const isHandRaised = !!currentResponse?.answeredYes;
 
-  const isStruck = juror.status.startsWith('struck_') || juror.status === 'cause_granted';
+  // In podium mode, cause strikes have not occurred yet in the courtroom.
+  // We rely on the Second Chair's "Plan to Strike" (strikeIntent).
+  const isCausePlan = juror.strikeIntent === 'strike_cause';
+  const isPeremptoryPlan = juror.strikeIntent === 'strike_peremptory';
+  const isStruck = juror.status === 'struck_plaintiff' || juror.status === 'struck_defense';
 
-  // Favorability styling
+  // Favorability & Strike Plan styling
   const rating = juror.rating || 0;
   let ratingBorder = 'border-slate-800';
   let ratingBg = 'bg-slate-900/90';
-  let ratingBadge = 'bg-slate-800 text-slate-300 border-slate-700';
 
   if (isStruck) {
+    // Actually exercised strike
     ratingBorder = 'border-slate-850 opacity-45';
     ratingBg = 'bg-slate-950/80';
+  } else if (isCausePlan) {
+    // Cause strike plan: Amber warning theme
+    ratingBorder = 'border-amber-500/90 ring-2 ring-amber-500/30';
+    ratingBg = 'bg-amber-950/25';
+  } else if (isPeremptoryPlan) {
+    // Peremptory strike plan: Blue/Indigo theme
+    ratingBorder = 'border-blue-500/90 ring-2 ring-blue-500/30';
+    ratingBg = 'bg-blue-950/25';
   } else if (rating > 0) {
     ratingBorder = rating >= 2 ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-emerald-500/60';
     ratingBg = 'bg-emerald-950/20';
-    ratingBadge = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold';
   } else if (rating < 0) {
     ratingBorder = rating <= -2 ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-rose-500/60';
     ratingBg = 'bg-rose-950/20';
-    ratingBadge = 'bg-rose-500/20 text-rose-300 border-rose-500/40 font-bold';
   }
 
   // Hand-raise highlight override
   if (isHandRaised) {
-    ratingBorder = 'border-amber-400 ring-4 ring-amber-500/30 shadow-lg shadow-amber-500/20 animate-pulse';
-    ratingBg = 'bg-amber-950/30';
+    ratingBorder = 'border-amber-400 ring-4 ring-amber-500/40 shadow-lg shadow-amber-500/20 animate-pulse';
+    ratingBg = 'bg-amber-950/35';
   }
 
   return (
@@ -56,17 +66,31 @@ export const PodiumJurorCard: React.FC<PodiumJurorCardProps> = ({
         isSelected ? 'scale-[1.02] ring-2 md:ring-4 ring-indigo-500' : 'hover:scale-[1.01]'
       } min-h-[46px] sm:min-h-[54px] md:min-h-[160px]`}
     >
-      {/* Mobile Compact View (Portrait & Landscape on mobile window sizes): Only Juror # and Name */}
+      {/* Mobile Compact View: Juror #, Strike Plan, and Name */}
       <div className="md:hidden flex flex-col justify-center items-center text-center h-full w-full min-w-0 overflow-hidden leading-tight py-0.5">
         <div className="flex items-center justify-center gap-1 w-full min-w-0">
           <span className={`text-xs sm:text-sm font-mono font-black truncate ${isStruck ? 'line-through text-slate-500' : 'text-slate-100'}`}>
             #{juror.jurorNumber}
           </span>
+          {isCausePlan && (
+            <span className="text-[9px] font-black uppercase px-1 py-0.5 rounded bg-amber-500/25 text-amber-300 border border-amber-500/50 flex items-center gap-0.5 shrink-0" title="Plan: Cause Strike">
+              <ShieldAlert className="w-2.5 h-2.5 text-amber-400" />
+              <span>CAUSE</span>
+            </span>
+          )}
+          {isPeremptoryPlan && (
+            <span className="text-[9px] font-black uppercase px-1 py-0.5 rounded bg-blue-500/25 text-blue-300 border border-blue-500/50 flex items-center gap-0.5 shrink-0" title="Plan: Peremptory Strike">
+              <Gavel className="w-2.5 h-2.5 text-blue-400" />
+              <span>PERM</span>
+            </span>
+          )}
           {isHandRaised && (
             <Hand className="w-3 h-3 fill-amber-300 text-amber-950 animate-bounce shrink-0" />
           )}
         </div>
-        <div className={`text-[10px] sm:text-xs font-semibold truncate w-full mt-0.5 ${isStruck ? 'line-through text-slate-500' : 'text-slate-200'}`}>
+        <div className={`text-[10px] sm:text-xs font-semibold truncate w-full mt-0.5 ${
+          isStruck ? 'line-through text-slate-500' : isCausePlan ? 'text-amber-200' : isPeremptoryPlan ? 'text-blue-200' : 'text-slate-200'
+        }`}>
           {juror.fullName}
         </div>
       </div>
@@ -81,11 +105,15 @@ export const PodiumJurorCard: React.FC<PodiumJurorCardProps> = ({
             </span>
             {isStruck ? (
               <span className="text-[10px] uppercase font-mono font-bold px-1.5 py-0.5 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/40">
-                {juror.status === 'cause_granted'
-                  ? 'Cause'
-                  : juror.status === 'struck_plaintiff'
-                  ? 'Struck (P)'
-                  : 'Struck (D)'}
+                {juror.status === 'struck_plaintiff' ? 'Struck (P)' : 'Struck (D)'}
+              </span>
+            ) : isCausePlan ? (
+              <span className="text-[11px] uppercase font-mono font-black px-2 py-0.5 rounded-md bg-amber-500/25 text-amber-300 border border-amber-500/50 flex items-center gap-1 shadow-sm">
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-400" /> Plan: Cause
+              </span>
+            ) : isPeremptoryPlan ? (
+              <span className="text-[11px] uppercase font-mono font-black px-2 py-0.5 rounded-md bg-blue-500/25 text-blue-300 border border-blue-500/50 flex items-center gap-1 shadow-sm">
+                <Gavel className="w-3.5 h-3.5 text-blue-400" /> Plan: Peremptory
               </span>
             ) : juror.seatNumber !== undefined ? (
               <span
@@ -130,15 +158,10 @@ export const PodiumJurorCard: React.FC<PodiumJurorCardProps> = ({
               <span>HAND RAISED</span>
             </div>
           ) : (
-            <div className="flex items-center gap-1">
-              {juror.strikeIntent === 'strike_cause' && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 border bg-amber-950/70 border-amber-700/80 text-amber-300 rounded-md">
-                  <ShieldAlert className="w-3.5 h-3.5" /> Cause
-                </span>
-              )}
-              {juror.strikeIntent === 'strike_peremptory' && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 bg-blue-950/70 border border-blue-700/80 text-blue-300 rounded-md">
-                  <Gavel className="w-3.5 h-3.5" /> Peremptory
+            <div className="flex items-center gap-1 overflow-hidden">
+              {juror.strikeIntentNote && (
+                <span className="text-[11px] italic text-slate-300 truncate max-w-[220px]" title={juror.strikeIntentNote}>
+                  "{juror.strikeIntentNote}"
                 </span>
               )}
             </div>

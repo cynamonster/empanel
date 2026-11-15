@@ -20,7 +20,9 @@ import {
   AlertTriangle,
   FileText,
   Volume2,
-  Unlink
+  Unlink,
+  ShieldAlert,
+  Gavel
 } from 'lucide-react';
 
 function getColumnSplits(totalCols: number, gutters: 'none' | '1'): number[] {
@@ -380,6 +382,36 @@ export const PodiumView: React.FC = () => {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Second Chair Plan to Strike Alert Banner */}
+              {spotlightJuror.strikeIntent && spotlightJuror.strikeIntent !== 'none' && (
+                <div className={`p-4 rounded-xl border flex flex-col gap-2 ${
+                  spotlightJuror.strikeIntent === 'strike_cause'
+                    ? 'bg-amber-950/40 border-amber-500/50 text-amber-200'
+                    : 'bg-blue-950/40 border-blue-500/50 text-blue-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
+                      {spotlightJuror.strikeIntent === 'strike_cause' ? (
+                        <>
+                          <ShieldAlert className="w-4 h-4 text-amber-400" />
+                          <span>Second Chair Plan: Strike For Cause</span>
+                        </>
+                      ) : (
+                        <>
+                          <Gavel className="w-4 h-4 text-blue-400" />
+                          <span>Second Chair Plan: Peremptory Strike</span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                  {spotlightJuror.strikeIntentNote && (
+                    <p className="text-xs italic bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 text-slate-200 leading-relaxed">
+                      "{spotlightJuror.strikeIntentNote}"
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Demographics Card */}
               <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-3">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
