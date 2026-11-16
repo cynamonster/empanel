@@ -251,7 +251,26 @@ export const StrikeConsoleModal: React.FC<StrikeConsoleModalProps> = ({ isOpen, 
                           </div>
                           <div className="text-[11px] text-slate-400 flex items-center space-x-2 mt-0.5">
                             <span>{cand.occupation || 'No occupation'}</span>
+                            {cand.strikeIntent && cand.strikeIntent !== 'none' && (
+                              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                                cand.strikeIntent === 'strike_cause'
+                                  ? 'bg-amber-950/70 border-amber-500/50 text-amber-300'
+                                  : 'bg-blue-950/70 border-blue-500/50 text-blue-300'
+                              }`}>
+                                {cand.strikeIntent === 'strike_cause' ? 'Cause Plan' : 'Peremptory Plan'}
+                              </span>
+                            )}
                           </div>
+                          {cand.strikeIntentNote && (
+                            <p className="text-[11px] text-amber-300/90 italic truncate max-w-sm mt-0.5" title={cand.strikeIntentNote}>
+                              "{cand.strikeIntentNote}"
+                            </p>
+                          )}
+                          {!cand.strikeIntentNote && cand.notes && (
+                            <p className="text-[11px] text-slate-400 italic truncate max-w-sm mt-0.5" title={cand.notes}>
+                              {cand.notes}
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -268,14 +287,14 @@ export const StrikeConsoleModal: React.FC<StrikeConsoleModalProps> = ({ isOpen, 
                         {/* Direct Strike Buttons */}
                         <div className="flex space-x-1.5">
                           <button
-                            onClick={() => recordPeremptoryStrike(cand.id, 'plaintiff_prosecution')}
+                            onClick={() => recordPeremptoryStrike(cand.id, 'plaintiff_prosecution', cand.strikeIntentNote || cand.notes)}
                             className="px-2.5 py-1 bg-rose-900/80 hover:bg-rose-800 text-rose-200 rounded-lg text-xs font-semibold border border-rose-700"
                             title={`Strike using ${activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'} peremptory`}
                           >
                             Strike ({activeCase.caseType === 'criminal' ? 'Pros' : 'P'})
                           </button>
                           <button
-                            onClick={() => recordPeremptoryStrike(cand.id, 'defense')}
+                            onClick={() => recordPeremptoryStrike(cand.id, 'defense', cand.strikeIntentNote || cand.notes)}
                             className="px-2.5 py-1 bg-blue-900/80 hover:bg-blue-800 text-blue-200 rounded-lg text-xs font-semibold border border-blue-700"
                             title="Strike using Defense peremptory"
                           >

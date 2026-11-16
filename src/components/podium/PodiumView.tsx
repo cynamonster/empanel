@@ -395,11 +395,13 @@ export const PodiumView: React.FC = () => {
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Second Chair Plan to Strike Alert Banner */}
-              {spotlightJuror.strikeIntent && spotlightJuror.strikeIntent !== 'none' && (
+              {((spotlightJuror.strikeIntent && spotlightJuror.strikeIntent !== 'none') || spotlightJuror.strikeIntentNote) && (
                 <div className={`p-4 rounded-xl border flex flex-col gap-2 ${
                   spotlightJuror.strikeIntent === 'strike_cause'
                     ? 'bg-amber-950/40 border-amber-500/50 text-amber-200'
-                    : 'bg-blue-950/40 border-blue-500/50 text-blue-200'
+                    : spotlightJuror.strikeIntent === 'strike_peremptory'
+                    ? 'bg-blue-950/40 border-blue-500/50 text-blue-200'
+                    : 'bg-slate-900 border-slate-750 text-slate-200'
                 }`}>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
@@ -408,10 +410,15 @@ export const PodiumView: React.FC = () => {
                           <ShieldAlert className="w-4 h-4 text-amber-400" />
                           <span>Second Chair Plan: Strike For Cause</span>
                         </>
-                      ) : (
+                      ) : spotlightJuror.strikeIntent === 'strike_peremptory' ? (
                         <>
                           <Gavel className="w-4 h-4 text-blue-400" />
                           <span>Second Chair Plan: Peremptory Strike</span>
+                        </>
+                      ) : (
+                        <>
+                          <Gavel className="w-4 h-4 text-slate-400" />
+                          <span>Second Chair Strike Assessment Notes</span>
                         </>
                       )}
                     </span>

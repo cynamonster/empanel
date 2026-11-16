@@ -349,9 +349,19 @@ export const JurorCard: React.FC<JurorCardProps> = ({
       {juror.strikeIntentNote && !compact && (
         <div
           className="mt-1 text-[10px] text-amber-300/90 italic truncate bg-amber-950/30 px-1.5 py-0.5 rounded border border-amber-900/40"
-          title={`Note to self: ${juror.strikeIntentNote}`}
+          title={`Strike assessment: ${juror.strikeIntentNote}`}
         >
-          📝 {juror.strikeIntentNote}
+          ⚖️ {juror.strikeIntentNote}
+        </div>
+      )}
+
+      {/* General Notes preview (when no strike note) */}
+      {!juror.strikeIntentNote && juror.notes && !compact && (
+        <div
+          className="mt-1 text-[10px] text-slate-400 italic truncate bg-slate-900/50 px-1.5 py-0.5 rounded border border-slate-800"
+          title={`Notes: ${juror.notes}`}
+        >
+          📝 {juror.notes}
         </div>
       )}
 

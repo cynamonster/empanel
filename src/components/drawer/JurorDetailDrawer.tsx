@@ -140,6 +140,39 @@ export const JurorDetailDrawer: React.FC = () => {
     });
   }, [juror?.id]);
 
+  // Real-time synchronization of notes and strike notes across sessions
+  useEffect(() => {
+    if (!juror) return;
+
+    if (document.activeElement !== notesRef.current) {
+      if (juror.notes !== undefined && juror.notes !== localNotes) {
+        setLocalNotes(juror.notes || '');
+        if (notesRef.current) {
+          requestAnimationFrame(() => {
+            if (notesRef.current) {
+              notesRef.current.style.height = 'auto';
+              notesRef.current.style.height = `${Math.max(72, notesRef.current.scrollHeight)}px`;
+            }
+          });
+        }
+      }
+    }
+
+    if (document.activeElement !== strikeNoteRef.current) {
+      if (juror.strikeIntentNote !== undefined && juror.strikeIntentNote !== localStrikeNote) {
+        setLocalStrikeNote(juror.strikeIntentNote || '');
+        if (strikeNoteRef.current) {
+          requestAnimationFrame(() => {
+            if (strikeNoteRef.current) {
+              strikeNoteRef.current.style.height = 'auto';
+              strikeNoteRef.current.style.height = `${Math.max(52, strikeNoteRef.current.scrollHeight)}px`;
+            }
+          });
+        }
+      }
+    }
+  }, [juror?.notes, juror?.strikeIntentNote]);
+
   useEffect(() => {
     return () => {
       flushUpdates();
@@ -558,9 +591,14 @@ export const JurorDetailDrawer: React.FC = () => {
 
           {/* Optional Note */}
           <div className="space-y-1 pt-1">
-            <span className="text-[10px] text-slate-400 uppercase font-semibold">
-              Reason / Bias:
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                Reason / Strike Notes:
+              </span>
+              <span className="text-[10px] text-indigo-400/80 font-mono">
+                Shared
+              </span>
+            </div>
             <textarea
               ref={strikeNoteRef}
               data-field="strikeIntentNote"
@@ -717,8 +755,11 @@ export const JurorDetailDrawer: React.FC = () => {
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Notes
+              General Notes
             </label>
+            <span className="text-[10px] text-indigo-400/80 font-mono">
+              Shared
+            </span>
           </div>
           <textarea
             ref={notesRef}
