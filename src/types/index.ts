@@ -115,7 +115,7 @@ export interface PeremptoryStrikeAction {
 
 export interface WhisperMessage {
   id: string;
-  sender: 'second_chair' | 'podium';
+  sender: 'second_chair' | 'podium' | 'host';
   text: string;
   timestamp: number;
   priority?: 'normal' | 'urgent';
@@ -123,6 +123,14 @@ export interface WhisperMessage {
 }
 
 export type ViewMode = 'table' | 'podium';
+
+export type SyncRole = 'host' | 'second_chair' | 'podium' | 'viewer' | null;
+
+export interface ConnectedPeer {
+  id: string;
+  role: 'host' | 'second_chair' | 'podium' | 'viewer';
+  joinedAt: number;
+}
 
 export type SyncStatus = 
   | 'idle' 

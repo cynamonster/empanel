@@ -22,7 +22,8 @@ import {
   Volume2,
   Unlink,
   ShieldAlert,
-  Gavel
+  Gavel,
+  LayoutGrid
 } from 'lucide-react';
 
 function getColumnSplits(totalCols: number, gutters: 'none' | '1'): number[] {
@@ -42,6 +43,7 @@ export const PodiumView: React.FC = () => {
     dismissWhisper,
     syncStatus,
     syncLatency,
+    changeSyncRole,
     disconnectSync,
   } = useCase();
 
@@ -203,6 +205,16 @@ export const PodiumView: React.FC = () => {
           >
             {highContrastLight ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4 text-amber-400" />}
           </button> */}
+
+          {/* Switch to Second Chair Table Console */}
+          <button
+            onClick={() => changeSyncRole('second_chair')}
+            title="Switch to Second Chair Table Console"
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 text-xs font-semibold transition-colors"
+          >
+            <LayoutGrid className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="hidden sm:inline">Table Console</span>
+          </button>
 
           {/* Fullscreen Button */}
           <button

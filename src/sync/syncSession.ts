@@ -10,9 +10,9 @@ import {
   type EncryptedEnvelope,
   type EmpanelKey,
 } from './crypto';
-import type { SyncStatus, WhisperMessage } from '../types';
+import type { SyncStatus, WhisperMessage, SyncRole, ConnectedPeer } from '../types';
 
-export type SyncRole = 'host' | 'viewer';
+export type { SyncRole };
 
 export type SyncMutation =
   | {
@@ -37,30 +37,36 @@ export type SyncMutation =
   | { type: 'REVERT_STRIKE'; jurorId: string }
   | { type: 'WHISPER'; message: WhisperMessage }
   | { type: 'DISMISS_WHISPER'; messageId: string }
+  | { type: 'PEER_ROLE_UPDATE'; peerId: string; role: SyncRole }
+  | { type: 'PEER_LIST'; peers: ConnectedPeer[] }
+  | { type: 'HOST_LEAVE' }
   | { type: 'PING'; timestamp: number }
   | { type: 'PONG'; timestamp: number };
 
 type SignalingMessage =
-  | { type: 'PEER_JOIN'; role: SyncRole; proof?: string }
+  | { type: 'PEER_JOIN'; peerId: string; role: SyncRole; proof?: string }
   | { type: 'AUTH_CHALLENGE'; challenge: string }
-  | { type: 'AUTH_PROOF'; proof: string }
-  | { type: 'AUTH_SUCCESS' }
-  | { type: 'AUTH_FAIL'; message?: string }
+  | { type: 'AUTH_PROOF'; proof: string; peerId?: string }
+  | { type: 'AUTH_SUCCESS'; peerId?: string }
+  | { type: 'AUTH_FAIL'; peerId?: string; message?: string }
   | { type: 'BURN_ROOM' }
   | { type: 'WEBRTC_OFFER'; sdp: EncryptedEnvelope }
   | { type: 'WEBRTC_ANSWER'; sdp: EncryptedEnvelope }
   | { type: 'WEBRTC_ICE'; candidate: EncryptedEnvelope }
   | { type: 'RELAY_MUTATION'; envelope: EncryptedEnvelope }
-  | { type: 'PEER_LEAVE' };
+  | { type: 'PEER_LEAVE'; peerId?: string }
+  | { type: 'HOST_DISCONNECT' };
 
 export interface SyncSessionEvents {
   onStatusChange?: (status: SyncStatus) => void;
   onAttemptChange?: (attempts: number, max: number) => void;
   onPeerJoined?: () => void;
+  onPeersChange?: (peers: ConnectedPeer[]) => void;
   onMutationReceived?: (mutation: SyncMutation) => void;
   onWhisperReceived?: (whisper: WhisperMessage) => void;
   onError?: (error: string) => void;
   onLatencyUpdate?: (latencyMs: number) => void;
+  onHostDisconnected?: () => void;
 }
 
 const RTC_CONFIG: RTCConfiguration = {
@@ -73,12 +79,16 @@ const RTC_CONFIG: RTCConfiguration = {
 };
 
 export class SyncSession {
+  private peerId: string = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : 'p-' + Math.random().toString(36).substring(2, 9);
   private role: SyncRole | null = null;
   private pin: string | null = null;
   private roomId: string | null = null;
   private cryptoKey: EmpanelKey | null = null;
   private authProof: string | null = null;
   private status: SyncStatus = 'idle';
+  private peers: Map<string, ConnectedPeer> = new Map();
 
   private bc: BroadcastChannel | null = null;
   private ws: WebSocket | null = null;
@@ -100,12 +110,36 @@ export class SyncSession {
     this.events = { ...this.events, ...events };
   }
 
+  public getPeerId(): string {
+    return this.peerId;
+  }
+
+  public getPeers(): ConnectedPeer[] {
+    return Array.from(this.peers.values());
+  }
+
   public getStatus(): SyncStatus {
     return this.status;
   }
 
   public getRole(): SyncRole | null {
     return this.role;
+  }
+
+  public async setRole(newRole: SyncRole) {
+    this.role = newRole;
+    if (this.status === 'connected_p2p' || this.status === 'connected_relay') {
+      if (this.role === 'host') {
+        this.peers.set(this.peerId, { id: this.peerId, role: 'host', joinedAt: Date.now() });
+        this.broadcastPeerList();
+      } else {
+        await this.sendMutation({
+          type: 'PEER_ROLE_UPDATE',
+          peerId: this.peerId,
+          role: newRole,
+        });
+      }
+    }
   }
 
   public getPin(): string | null {
@@ -121,6 +155,14 @@ export class SyncSession {
     this.events.onStatusChange?.(newStatus);
   }
 
+  private broadcastPeerList() {
+    if (this.role === 'host') {
+      const list = this.getPeers();
+      this.events.onPeersChange?.(list);
+      this.sendMutation({ type: 'PEER_LIST', peers: list });
+    }
+  }
+
   /**
    * Host starts a pairing session with the given 6-character PIN.
    */
@@ -128,7 +170,10 @@ export class SyncSession {
     this.cleanup();
     this.role = 'host';
     this.pin = pin;
+    this.peers.clear();
+    this.peers.set(this.peerId, { id: this.peerId, role: 'host', joinedAt: Date.now() });
     this.setStatus('hosting');
+    this.events.onPeersChange?.(this.getPeers());
 
     try {
       this.roomId = await deriveRoomId(pin);
@@ -141,12 +186,13 @@ export class SyncSession {
   }
 
   /**
-   * Viewer joins a session with the given 6-character PIN.
+   * Peer joins a session with the given 6-character PIN and initial role.
    */
-  public async joinSession(pin: string) {
+  public async joinSession(pin: string, initialRole: SyncRole = 'viewer') {
     this.cleanup();
-    this.role = 'viewer';
+    this.role = initialRole;
     this.pin = pin;
+    this.peers.clear();
     this.setStatus('joining');
 
     try {
@@ -158,7 +204,12 @@ export class SyncSession {
       // Announce presence immediately and retry periodically until handshake completes
       const sendJoin = () => {
         if (this.status === 'joining' && this.authProof) {
-          this.sendSignalingMessage({ type: 'PEER_JOIN', role: 'viewer', proof: this.authProof });
+          this.sendSignalingMessage({
+            type: 'PEER_JOIN',
+            peerId: this.peerId,
+            role: this.role || 'viewer',
+            proof: this.authProof,
+          });
         }
       };
 
@@ -204,10 +255,15 @@ export class SyncSession {
     const relayUrl = (window as any).__EMPANEL_RELAY_URL__ || this.getRelayUrl();
     if (relayUrl) {
       try {
-        this.ws = new WebSocket(`${relayUrl}?room=${this.roomId}&role=${this.role}`);
+        this.ws = new WebSocket(`${relayUrl}?room=${this.roomId}&role=${this.role}&peer=${this.peerId}`);
         this.ws.onopen = () => {
-          if (this.role === 'viewer' && this.status === 'joining' && this.authProof) {
-            this.sendSignalingMessage({ type: 'PEER_JOIN', role: 'viewer', proof: this.authProof });
+          if (this.role !== 'host' && this.status === 'joining' && this.authProof) {
+            this.sendSignalingMessage({
+              type: 'PEER_JOIN',
+              peerId: this.peerId,
+              role: this.role || 'viewer',
+              proof: this.authProof,
+            });
           }
         };
         this.ws.onmessage = (event) => {
@@ -272,14 +328,21 @@ export class SyncSession {
             // Direct 1-step auth verification
             const isValid = await verifyAuthProof(this.cryptoKey, 'empanel-join', msg.proof);
             if (isValid) {
+              const joiningPeerId = msg.peerId || `peer-${Date.now()}`;
+              this.peers.set(joiningPeerId, {
+                id: joiningPeerId,
+                role: msg.role || 'second_chair',
+                joinedAt: Date.now(),
+              });
               this.setStatus('connected_relay');
               this.startHeartbeat();
-              this.sendSignalingMessage({ type: 'AUTH_SUCCESS' });
+              this.sendSignalingMessage({ type: 'AUTH_SUCCESS', peerId: joiningPeerId });
+              this.broadcastPeerList();
               this.events.onPeerJoined?.();
               await this.initWebRTC(true);
             } else {
-              // Wrong PIN on viewer - inform viewer without burning room
-              this.sendSignalingMessage({ type: 'AUTH_FAIL', message: 'Incorrect PIN' });
+              // Wrong PIN on peer - inform peer without burning room
+              this.sendSignalingMessage({ type: 'AUTH_FAIL', peerId: msg.peerId, message: 'Incorrect PIN' });
             }
           } else {
             // Legacy 2-step challenge fallback
@@ -293,9 +356,9 @@ export class SyncSession {
         break;
 
       case 'AUTH_CHALLENGE':
-        if (this.role === 'viewer' && this.cryptoKey) {
+        if (this.role !== 'host' && this.cryptoKey) {
           const proof = await computeAuthProof(this.cryptoKey, msg.challenge);
-          this.sendSignalingMessage({ type: 'AUTH_PROOF', proof });
+          this.sendSignalingMessage({ type: 'AUTH_PROOF', proof, peerId: this.peerId });
         }
         break;
 
@@ -308,36 +371,51 @@ export class SyncSession {
           );
 
           if (isValid) {
-            this.sendSignalingMessage({ type: 'AUTH_SUCCESS' });
+            const joiningPeerId = msg.peerId || `peer-${Date.now()}`;
+            this.peers.set(joiningPeerId, {
+              id: joiningPeerId,
+              role: 'second_chair',
+              joinedAt: Date.now(),
+            });
+            this.sendSignalingMessage({ type: 'AUTH_SUCCESS', peerId: joiningPeerId });
+            this.broadcastPeerList();
+            this.events.onPeerJoined?.();
             await this.initWebRTC(true);
           } else {
-            this.sendSignalingMessage({ type: 'AUTH_FAIL', message: 'Incorrect PIN' });
+            this.sendSignalingMessage({ type: 'AUTH_FAIL', peerId: msg.peerId, message: 'Incorrect PIN' });
           }
         }
         break;
 
       case 'AUTH_SUCCESS':
-        if (this.role === 'viewer') {
-          if (this.joinRetryInterval) {
-            clearInterval(this.joinRetryInterval);
-            this.joinRetryInterval = null;
+        if (this.role !== 'host') {
+          if (!msg.peerId || msg.peerId === this.peerId) {
+            if (this.joinRetryInterval) {
+              clearInterval(this.joinRetryInterval);
+              this.joinRetryInterval = null;
+            }
+            // Immediately enter connected_relay state to receive snapshot
+            this.setStatus('connected_relay');
+            this.startHeartbeat();
+            this.sendMutation({ type: 'REQUEST_SNAPSHOT' });
+            if (this.role && this.role !== 'viewer') {
+              this.sendMutation({ type: 'PEER_ROLE_UPDATE', peerId: this.peerId, role: this.role });
+            }
+            await this.initWebRTC(false);
           }
-          // Immediately enter connected_relay state to receive snapshot without 3.5s delay
-          this.setStatus('connected_relay');
-          this.startHeartbeat();
-          this.sendMutation({ type: 'REQUEST_SNAPSHOT' });
-          await this.initWebRTC(false);
         }
         break;
 
       case 'AUTH_FAIL':
-        if (this.role === 'viewer') {
-          if (this.joinRetryInterval) {
-            clearInterval(this.joinRetryInterval);
-            this.joinRetryInterval = null;
+        if (this.role !== 'host') {
+          if (!msg.peerId || msg.peerId === this.peerId) {
+            if (this.joinRetryInterval) {
+              clearInterval(this.joinRetryInterval);
+              this.joinRetryInterval = null;
+            }
+            this.setStatus('error');
+            this.events.onError?.('Incorrect PIN. Please re-enter the 6-letter PIN from the host screen.');
           }
-          this.setStatus('error');
-          this.events.onError?.('Incorrect PIN. Please re-enter the 6-character PIN from the host screen.');
         }
         break;
 
@@ -348,7 +426,7 @@ export class SyncSession {
         break;
 
       case 'WEBRTC_OFFER':
-        if (this.role === 'viewer' && this.cryptoKey) {
+        if (this.role !== 'host' && this.cryptoKey) {
           try {
             if (!this.pc) {
               await this.initWebRTC(false);
@@ -415,7 +493,26 @@ export class SyncSession {
         break;
 
       case 'PEER_LEAVE':
-        this.setStatus('disconnected');
+        if (msg.peerId) {
+          this.peers.delete(msg.peerId);
+          if (this.role === 'host') {
+            this.broadcastPeerList();
+            if (this.peers.size <= 1) {
+              this.setStatus('hosting');
+            }
+          }
+        } else if (this.role !== 'host') {
+          this.setStatus('disconnected');
+          this.events.onHostDisconnected?.();
+        }
+        break;
+
+      case 'HOST_DISCONNECT':
+        if (this.role !== 'host') {
+          this.cleanupConnections();
+          this.setStatus('disconnected');
+          this.events.onHostDisconnected?.();
+        }
         break;
     }
   }
@@ -531,12 +628,12 @@ export class SyncSession {
     channel.onopen = () => {
       this.setStatus('connected_p2p');
       this.startHeartbeat();
-      if (this.role === 'viewer') {
+      if (this.role !== 'host') {
         // Request initial full state snapshot
         this.sendMutation({ type: 'REQUEST_SNAPSHOT' });
         // Snapshot retry safeguard after 1.5s
         setTimeout(() => {
-          if (this.role === 'viewer' && (this.status === 'connected_p2p' || this.status === 'connected_relay')) {
+          if (this.role !== 'host' && (this.status === 'connected_p2p' || this.status === 'connected_relay')) {
             this.sendMutation({ type: 'REQUEST_SNAPSHOT' });
           }
         }, 1500);
@@ -571,6 +668,38 @@ export class SyncSession {
       this.events.onLatencyUpdate?.(Math.max(1, Math.round(latency / 2)));
       return;
     }
+    if (mutation.type === 'PEER_ROLE_UPDATE') {
+      if (this.role === 'host') {
+        const role = mutation.role || 'second_chair';
+        const existing = this.peers.get(mutation.peerId);
+        if (existing) {
+          existing.role = role;
+        } else {
+          this.peers.set(mutation.peerId, {
+            id: mutation.peerId,
+            role,
+            joinedAt: Date.now(),
+          });
+        }
+        this.broadcastPeerList();
+      }
+      return;
+    }
+    if (mutation.type === 'PEER_LIST') {
+      this.peers.clear();
+      for (const p of mutation.peers) {
+        this.peers.set(p.id, p);
+      }
+      this.events.onPeersChange?.(mutation.peers);
+      return;
+    }
+    if (mutation.type === 'HOST_LEAVE') {
+      if (this.role !== 'host') {
+        this.setStatus('disconnected');
+        this.events.onHostDisconnected?.();
+      }
+      return;
+    }
     if (mutation.type === 'WHISPER') {
       this.events.onWhisperReceived?.(mutation.message);
     }
@@ -588,19 +717,21 @@ export class SyncSession {
   }
 
   /**
-   * Broadcasts a mutation encrypted with AES-256-GCM.
+   * Broadcasts a mutation encrypted with AES-256-GCM across all peers in the room.
    */
   public async sendMutation(mutation: SyncMutation) {
     if (!this.cryptoKey) return;
     try {
       const envelope = await encryptPayload(this.cryptoKey, mutation);
 
-      // Prefer WebRTC DataChannel (Direct P2P)
+      // Multi-peer broadcast via WebSocket relay
+      this.sendSignalingMessage({ type: 'RELAY_MUTATION', envelope });
+
+      // Direct WebRTC DataChannel (if available)
       if (this.dataChannel && this.dataChannel.readyState === 'open') {
-        this.dataChannel.send(JSON.stringify(envelope));
-      } else {
-        // Fall back to E2EE Relay
-        this.sendSignalingMessage({ type: 'RELAY_MUTATION', envelope });
+        try {
+          this.dataChannel.send(JSON.stringify(envelope));
+        } catch (e) {}
       }
     } catch (err) {
       console.error('Failed to send mutation', err);
@@ -611,9 +742,10 @@ export class SyncSession {
    * Sends a quick tactical whisper message between sessions.
    */
   public async sendWhisper(text: string, priority: 'normal' | 'urgent' = 'normal') {
+    const sender = this.role === 'host' ? 'host' : this.role === 'second_chair' ? 'second_chair' : 'podium';
     const whisper: WhisperMessage = {
       id: `w-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      sender: this.role === 'host' ? 'second_chair' : 'podium',
+      sender,
       text: text.trim(),
       timestamp: Date.now(),
       priority,
@@ -624,10 +756,25 @@ export class SyncSession {
   }
 
   /**
+   * Disconnects and announces departure to peers.
+   */
+  public disconnect() {
+    try {
+      if (this.role === 'host') {
+        this.sendSignalingMessage({ type: 'HOST_DISCONNECT' });
+        this.sendMutation({ type: 'HOST_LEAVE' });
+      } else {
+        this.sendSignalingMessage({ type: 'PEER_LEAVE', peerId: this.peerId });
+      }
+    } catch (e) {}
+    this.cleanup();
+  }
+
+  /**
    * Resets and disconnects the session (replaces legacy room burn).
    */
   public burnRoom() {
-    this.cleanup();
+    this.disconnect();
   }
 
   private cleanupConnections() {

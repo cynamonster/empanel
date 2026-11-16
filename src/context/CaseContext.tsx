@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import type { Case, Juror, Question, CauseChallenge, PeremptoryStrikeAction, ViewMode, SyncStatus, WhisperMessage } from '../types';
+import type { Case, Juror, Question, CauseChallenge, PeremptoryStrikeAction, ViewMode, SyncStatus, WhisperMessage, SyncRole, ConnectedPeer } from '../types';
 import { db, createDefaultCase, getSavedViewerPin, saveViewerPin, clearSavedViewerPin } from '../db';
 import { getDemoCaseData } from '../data/demoCase';
 import { syncSession } from '../sync/syncSession';
@@ -30,12 +30,16 @@ interface CaseContextValue {
 
   // Real-time E2EE Sync & Pairing
   syncStatus: SyncStatus;
-  syncRole: 'host' | 'viewer' | null;
+  syncRole: SyncRole;
   syncPin: string | null;
   syncAttempts: { current: number; max: number };
   syncLatency: number | null;
+  connectedPeers: ConnectedPeer[];
+  sessionEndedPrompt: boolean;
   startHostingSync: () => Promise<string>;
-  joinSyncSession: (pin: string) => Promise<void>;
+  joinSyncSession: (pin: string, requestedRole?: 'second_chair' | 'podium') => Promise<void>;
+  changeSyncRole: (newRole: 'second_chair' | 'podium') => Promise<void>;
+  resolveSessionEnded: (keepLocalCopy: boolean) => Promise<void>;
   burnSyncRoom: () => void;
   disconnectSync: () => void;
 
@@ -116,10 +120,10 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return 'table';
   });
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
-  const [syncRole, setSyncRole] = useState<'host' | 'viewer' | null>(() => {
+  const [syncRole, setSyncRole] = useState<SyncRole>(() => {
     try {
       if (typeof window !== 'undefined' && localStorage.getItem('empanel_viewer_pin')) {
-        return 'viewer';
+        return 'second_chair';
       }
     } catch (e) {}
     return null;
@@ -127,6 +131,9 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [syncPin, setSyncPin] = useState<string | null>(null);
   const [syncAttempts, setSyncAttempts] = useState<{ current: number; max: number }>({ current: 0, max: 3 });
   const [syncLatency, setSyncLatency] = useState<number | null>(null);
+  const [connectedPeers, setConnectedPeers] = useState<ConnectedPeer[]>([]);
+  const [sessionEndedPrompt, setSessionEndedPrompt] = useState(false);
+  const priorCaseIdRef = useRef<string | null>(null);
   const [whispers, setWhispers] = useState<WhisperMessage[]>([]);
   const [activeWhisper, setActiveWhisper] = useState<WhisperMessage | null>(null);
 
@@ -247,6 +254,12 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       onAttemptChange: (current, max) => {
         setSyncAttempts({ current, max });
       },
+      onPeersChange: (peers) => {
+        setConnectedPeers(peers);
+      },
+      onHostDisconnected: () => {
+        setSessionEndedPrompt(true);
+      },
       onLatencyUpdate: (latencyMs) => {
         setSyncLatency(latencyMs);
       },
@@ -257,11 +270,26 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       onMutationReceived: async (mutation) => {
         switch (mutation.type) {
           case 'SNAPSHOT':
-            if (mutation.payload.activeCase) setActiveCase(mutation.payload.activeCase);
-            if (mutation.payload.jurors) setJurors(mutation.payload.jurors);
-            if (mutation.payload.questions) setQuestions(mutation.payload.questions);
-            if (mutation.payload.causeChallenges) setCauseChallenges(mutation.payload.causeChallenges);
-            if (mutation.payload.peremptoryStrikes) setPeremptoryStrikes(mutation.payload.peremptoryStrikes);
+            if (mutation.payload.activeCase) {
+              setActiveCase(mutation.payload.activeCase);
+              db.cases.put(mutation.payload.activeCase).catch(() => {});
+            }
+            if (mutation.payload.jurors) {
+              setJurors(mutation.payload.jurors);
+              db.jurors.bulkPut(mutation.payload.jurors).catch(() => {});
+            }
+            if (mutation.payload.questions) {
+              setQuestions(mutation.payload.questions);
+              db.questions.bulkPut(mutation.payload.questions).catch(() => {});
+            }
+            if (mutation.payload.causeChallenges) {
+              setCauseChallenges(mutation.payload.causeChallenges);
+              db.causeChallenges.bulkPut(mutation.payload.causeChallenges).catch(() => {});
+            }
+            if (mutation.payload.peremptoryStrikes) {
+              setPeremptoryStrikes(mutation.payload.peremptoryStrikes);
+              db.peremptoryStrikes.bulkPut(mutation.payload.peremptoryStrikes).catch(() => {});
+            }
             break;
 
           case 'REQUEST_SNAPSHOT':
@@ -288,18 +316,26 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
             break;
 
           case 'UPDATE_JUROR':
-            setJurors(prev =>
-              prev.map(j => (j.id === mutation.jurorId ? { ...j, ...mutation.updates, updatedAt: Date.now() } : j))
-            );
+            setJurors(prev => {
+              const updated = prev.map(j => (j.id === mutation.jurorId ? { ...j, ...mutation.updates, updatedAt: Date.now() } : j));
+              const juror = updated.find(j => j.id === mutation.jurorId);
+              if (juror) db.jurors.put(juror).catch(() => {});
+              return updated;
+            });
             break;
 
           case 'UPDATE_CASE':
-            setActiveCase(prev => (prev ? { ...prev, ...mutation.updates, updatedAt: Date.now() } : null));
+            setActiveCase(prev => {
+              if (!prev) return null;
+              const updated = { ...prev, ...mutation.updates, updatedAt: Date.now() };
+              db.cases.put(updated).catch(() => {});
+              return updated;
+            });
             break;
 
           case 'TOGGLE_RESPONSE':
-            setJurors(prev =>
-              prev.map(j => {
+            setJurors(prev => {
+              const updated = prev.map(j => {
                 if (j.id !== mutation.jurorId) return j;
                 const existing = j.responses?.[mutation.questionId]?.answeredYes;
                 const existingNote = j.responses?.[mutation.questionId]?.note;
@@ -313,88 +349,110 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     },
                   },
                 };
-              })
-            );
+              });
+              const juror = updated.find(j => j.id === mutation.jurorId);
+              if (juror) db.jurors.put(juror).catch(() => {});
+              return updated;
+            });
             break;
 
           case 'ASSIGN_SEAT':
-            setJurors(prev =>
-              prev.map(j => {
+            setJurors(prev => {
+              const updated = prev.map(j => {
                 if (j.id === mutation.jurorId) {
                   return {
                     ...j,
                     seatNumber: mutation.seatNumber,
                     isAlternate: mutation.isAlternate,
-                    status: mutation.isAlternate ? 'alternate' : 'seated',
+                    status: mutation.isAlternate ? ('alternate' as const) : ('seated' as const),
                   };
                 }
                 return j;
-              })
-            );
+              });
+              const juror = updated.find(j => j.id === mutation.jurorId);
+              if (juror) db.jurors.put(juror).catch(() => {});
+              return updated;
+            });
             break;
 
           case 'UNSEAT_JUROR':
-            setJurors(prev =>
-              prev.map(j => {
+            setJurors(prev => {
+              const updated = prev.map(j => {
                 if (j.id === mutation.jurorId) {
                   return {
                     ...j,
                     seatNumber: undefined,
                     isAlternate: false,
-                    status: j.status === 'seated' || j.status === 'alternate' ? 'active' : j.status,
+                    status: j.status === 'seated' || j.status === 'alternate' ? ('active' as const) : j.status,
                   };
                 }
                 return j;
-              })
-            );
+              });
+              const juror = updated.find(j => j.id === mutation.jurorId);
+              if (juror) db.jurors.put(juror).catch(() => {});
+              return updated;
+            });
             break;
 
           case 'RECORD_STRIKE':
             setPeremptoryStrikes(prev => [mutation.strike, ...prev]);
-            setJurors(prev =>
-              prev.map(j =>
+            db.peremptoryStrikes.put(mutation.strike).catch(() => {});
+            setJurors(prev => {
+              const updated = prev.map(j =>
                 j.id === mutation.strike.jurorId
                   ? {
                       ...j,
                       status:
                         mutation.strike.side === 'plaintiff_prosecution'
-                          ? 'struck_plaintiff'
-                          : 'struck_defense',
+                          ? ('struck_plaintiff' as const)
+                          : ('struck_defense' as const),
                       seatNumber: undefined,
                       isAlternate: false,
                     }
                   : j
-              )
-            );
+              );
+              const juror = updated.find(j => j.id === mutation.strike.jurorId);
+              if (juror) db.jurors.put(juror).catch(() => {});
+              return updated;
+            });
             break;
 
           case 'RECORD_CAUSE':
             setCauseChallenges(prev => [mutation.challenge, ...prev]);
+            db.causeChallenges.put(mutation.challenge).catch(() => {});
             if (mutation.challenge.ruling === 'granted') {
-              setJurors(prev =>
-                prev.map(j =>
+              setJurors(prev => {
+                const updated = prev.map(j =>
                   j.id === mutation.challenge.jurorId
-                    ? { ...j, status: 'cause_granted', seatNumber: undefined, isAlternate: false }
+                    ? { ...j, status: 'cause_granted' as const, seatNumber: undefined, isAlternate: false }
                     : j
-                )
-              );
+                );
+                const juror = updated.find(j => j.id === mutation.challenge.jurorId);
+                if (juror) db.jurors.put(juror).catch(() => {});
+                return updated;
+              });
             }
             break;
 
           case 'REVERT_STRIKE':
             setPeremptoryStrikes(prev => prev.filter(s => s.jurorId !== mutation.jurorId));
             setCauseChallenges(prev => prev.filter(c => c.jurorId !== mutation.jurorId));
-            setJurors(prev =>
-              prev.map(j => {
+            db.peremptoryStrikes.where('jurorId').equals(mutation.jurorId).delete().catch(() => {});
+            db.causeChallenges.where('jurorId').equals(mutation.jurorId).delete().catch(() => {});
+            setJurors(prev => {
+              const updated = prev.map(j => {
                 if (j.id === mutation.jurorId) {
                   return {
                     ...j,
-                    status: j.seatNumber !== undefined ? (j.isAlternate ? 'alternate' : 'seated') : 'active',
+                    status: j.seatNumber !== undefined ? (j.isAlternate ? ('alternate' as const) : ('seated' as const)) : ('active' as const),
                   };
                 }
                 return j;
-              })
-            );
+              });
+              const juror = updated.find(j => j.id === mutation.jurorId);
+              if (juror) db.jurors.put(juror).catch(() => {});
+              return updated;
+            });
             break;
 
           case 'DISMISS_WHISPER':
@@ -915,12 +973,47 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return pin;
   };
 
-  const joinSyncSession = async (pin: string): Promise<void> => {
+  const joinSyncSession = async (pin: string, requestedRole: 'second_chair' | 'podium' = 'second_chair'): Promise<void> => {
+    if (activeCase?.id && !priorCaseIdRef.current) {
+      priorCaseIdRef.current = activeCase.id;
+    }
     setSyncPin(pin);
-    setSyncRole('viewer');
+    setSyncRole(requestedRole);
     await saveViewerPin(pin);
-    await syncSession.joinSession(pin);
-    setViewMode('podium'); // Automatically switch viewer into podium glanceable mode
+    await syncSession.joinSession(pin, requestedRole);
+    if (requestedRole === 'podium') {
+      setViewMode('podium');
+    } else {
+      setViewMode('table');
+    }
+  };
+
+  const changeSyncRole = async (newRole: 'second_chair' | 'podium'): Promise<void> => {
+    setSyncRole(newRole);
+    if (newRole === 'podium') {
+      setViewMode('podium');
+    } else {
+      setViewMode('table');
+    }
+    await syncSession.setRole(newRole);
+  };
+
+  const resolveSessionEnded = async (keepLocalCopy: boolean): Promise<void> => {
+    setSessionEndedPrompt(false);
+    clearSavedViewerPin().catch(() => {});
+    syncSession.cleanup();
+    setSyncPin(null);
+    setSyncRole(null);
+    setConnectedPeers([]);
+    setSyncStatus('idle');
+
+    if (!keepLocalCopy && priorCaseIdRef.current) {
+      const priorId = priorCaseIdRef.current;
+      priorCaseIdRef.current = null;
+      await switchCase(priorId);
+    } else {
+      priorCaseIdRef.current = null;
+    }
   };
 
   const burnSyncRoom = () => {
@@ -930,9 +1023,10 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const disconnectSync = () => {
     clearSavedViewerPin().catch(() => {});
-    syncSession.cleanup();
+    syncSession.disconnect();
     setSyncPin(null);
     setSyncRole(null);
+    setConnectedPeers([]);
     setSyncStatus('idle');
     setViewMode('table');
   };
@@ -955,6 +1049,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const undo = async () => {
+    if (syncRole === 'second_chair' || syncRole === 'podium') return;
     if (undoStack.length === 0 || !activeCase) return;
     const previous = undoStack[undoStack.length - 1];
     const newUndo = undoStack.slice(0, -1);
@@ -982,6 +1077,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const redo = async () => {
+    if (syncRole === 'second_chair' || syncRole === 'podium') return;
     if (redoStack.length === 0 || !activeCase) return;
     const next = redoStack[redoStack.length - 1];
     const newRedo = redoStack.slice(0, -1);
@@ -1207,8 +1303,12 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     syncPin,
     syncAttempts,
     syncLatency,
+    connectedPeers,
+    sessionEndedPrompt,
     startHostingSync,
     joinSyncSession,
+    changeSyncRole,
+    resolveSessionEnded,
     burnSyncRoom,
     disconnectSync,
     whispers,
@@ -1235,8 +1335,8 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     restoreFromBackup,
     loadDemoCase,
     refreshData,
-    canUndo: undoStack.length > 0,
-    canRedo: redoStack.length > 0,
+    canUndo: syncRole !== 'second_chair' && syncRole !== 'podium' && undoStack.length > 0,
+    canRedo: syncRole !== 'second_chair' && syncRole !== 'podium' && redoStack.length > 0,
     undo,
     redo,
     prefillSequentialPanel,
@@ -1261,6 +1361,8 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     syncPin,
     syncAttempts,
     syncLatency,
+    connectedPeers,
+    sessionEndedPrompt,
     whispers,
     activeWhisper,
     undoStack.length,

@@ -14,7 +14,8 @@ import {
   Sparkles,
   Undo2,
   Redo2,
-  Radio
+  Radio,
+  Maximize2
 } from 'lucide-react';
 import { Tooltip } from '../common/Tooltip';
 
@@ -50,6 +51,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     undo,
     redo,
     syncStatus,
+    syncRole,
+    connectedPeers,
+    changeSyncRole,
     syncLatency,
   } = useCase();
 
@@ -77,13 +81,25 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Case Dropdown (Hidden on mobile screen sizes) */}
         <div className="relative hidden sm:block">
           <button
-            onClick={() => setShowCaseMenu(!showCaseMenu)}
-            className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-sm font-medium transition-colors"
+            onClick={() => {
+              if (syncRole !== 'second_chair') {
+                setShowCaseMenu(!showCaseMenu);
+              }
+            }}
+            disabled={syncRole === 'second_chair'}
+            className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-sm font-medium transition-colors disabled:cursor-default"
+            title={syncRole === 'second_chair' ? 'Shared courtroom trial (Active case controlled by host)' : 'Select or switch court case'}
           >
             <span className="truncate max-w-[30rem] text-slate-200">
               {activeCase?.name || 'Select Case'}
             </span>
-            <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            {syncRole === 'second_chair' ? (
+              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-1.5 py-0.5 rounded font-mono font-medium">
+                Synced
+              </span>
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            )}
           </button>
 
           {showCaseMenu && (
@@ -219,23 +235,53 @@ export const Navbar: React.FC<NavbarProps> = ({
           </span>
         </button>
 
-        {/* E2EE Podium Session Linker / Sync Button */}
+        {/* E2EE Sync Status / Pair Button */}
         {syncStatus === 'connected_p2p' || syncStatus === 'connected_relay' ? (
-          <button
-            onClick={() => onOpenPairModal()}
-            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs border border-emerald-500/50 bg-emerald-500/20 text-emerald-300 transition-colors flex-shrink-0"
-            title="E2EE Session Active (Click to manage)"
-          >
-            <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            <span className="font-mono text-xs">
-              Linked
-            </span>
-          </button>
+          <div className="flex items-center space-x-1.5 flex-shrink-0">
+            <button
+              onClick={() => onOpenPairModal()}
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
+                syncRole === 'second_chair'
+                  ? 'border-indigo-500/50 bg-indigo-500/20 text-indigo-300'
+                  : 'border-emerald-500/50 bg-emerald-500/20 text-emerald-300'
+              }`}
+              title={
+                syncRole === 'second_chair'
+                  ? 'Connected as Second Chair (Click to manage)'
+                  : `Host Active (${connectedPeers.length > 1 ? `${connectedPeers.length - 1} peers connected` : 'Waiting for peers'})`
+              }
+            >
+              <Radio
+                className={`w-3.5 h-3.5 ${
+                  syncRole === 'second_chair' ? 'text-indigo-400' : 'text-emerald-400'
+                } animate-pulse`}
+              />
+              <span className="font-mono text-xs font-semibold">
+                {syncRole === 'second_chair'
+                  ? '2nd Chair'
+                  : connectedPeers.length > 1
+                  ? `${connectedPeers.length - 1} Linked`
+                  : 'Host'}
+              </span>
+            </button>
+
+            {/* If Second Chair, allow quick toggle to Podium View */}
+            {syncRole === 'second_chair' && (
+              <button
+                onClick={() => changeSyncRole('podium')}
+                className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-750 border border-slate-700 text-amber-300 hover:text-amber-200 transition-colors"
+                title="Switch to First Chair (Podium View)"
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden md:inline text-xs font-medium">Podium</span>
+              </button>
+            )}
+          </div>
         ) : (
           <button
             onClick={() => onOpenPairModal()}
             className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 transition-colors flex-shrink-0"
-            title="E2EE Podium Linking / Sync"
+            title="E2EE Linking / Sync"
           >
             <Radio className="w-3.5 h-3.5 text-slate-400" />
             <span>Pair</span>

@@ -2,7 +2,7 @@
 // Universal implementation with native WebCrypto API and pure JS fallback
 // for non-secure contexts (e.g. mobile devices connecting over Wi-Fi HTTP).
 
-const PIN_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 characters, avoids 0/O, 1/I
+const PIN_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'; // 26 uppercase letters only
 const PBKDF2_SALT = new TextEncoder().encode('empanel-e2ee-pbkdf2-salt-v1');
 const ROOM_SALT = 'empanel-room-salt-v1';
 
@@ -21,7 +21,7 @@ function getRandomBytes(len: number): Uint8Array {
 }
 
 /**
- * Generates a human-friendly 6-character alphanumeric PIN.
+ * Generates a human-friendly 6-character letter PIN (e.g. "FLX-MQB").
  */
 export function generatePin(): string {
   const values = getRandomBytes(6);
@@ -33,7 +33,7 @@ export function generatePin(): string {
 }
 
 /**
- * Formats a PIN for readable display (e.g. "K7M-9P2").
+ * Formats a PIN for readable display (e.g. "FLX-MQB").
  */
 export function formatPin(pin: string): string {
   const clean = normalizePin(pin);
@@ -49,7 +49,7 @@ export function normalizePin(pin: string): string {
 }
 
 /**
- * Validates whether a normalized PIN is valid 6-char alphanumeric.
+ * Validates whether a normalized PIN is a valid 6-letter PIN.
  */
 export function isValidPin(pin: string): boolean {
   const clean = normalizePin(pin);

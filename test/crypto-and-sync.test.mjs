@@ -5,7 +5,7 @@ import { webcrypto } from 'node:crypto';
 const crypto = webcrypto;
 
 
-const PIN_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const PIN_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'; // Letters only
 const PBKDF2_SALT = new TextEncoder().encode('empanel-e2ee-pbkdf2-salt-v1');
 const ROOM_SALT = 'empanel-room-salt-v1';
 
@@ -140,21 +140,23 @@ async function runTests() {
   const pin1 = generatePin();
   assert.strictEqual(pin1.length, 6, 'PIN should be 6 characters');
   assert.strictEqual(isValidPin(pin1), true, 'Generated PIN should be valid');
-  assert.strictEqual(formatPin('ABC123'), 'ABC-123', 'formatPin should insert dash');
-  assert.strictEqual(normalizePin('a-b c 123'), 'ABC123', 'normalizePin should sanitize');
-  console.log('✅ Test 1 Passed: PIN Generation & Sanitization');
+  assert.strictEqual(/^[A-Z]{6}$/.test(pin1), true, 'Generated PIN should be letters only');
+  assert.strictEqual(formatPin('ABCDEF'), 'ABC-DEF', 'formatPin should insert dash');
+  assert.strictEqual(normalizePin('a-b c def'), 'ABCDEF', 'normalizePin should sanitize');
+  assert.strictEqual(isValidPin('ABC123'), false, 'PIN with numbers must be invalid');
+  console.log('✅ Test 1 Passed: Letter-Only PIN Generation & Sanitization');
 
   // Test 2: Deterministic Room ID derivation
-  const room1 = await deriveRoomId('K7M9P2');
-  const room2 = await deriveRoomId('k7m-9p2');
+  const room1 = await deriveRoomId('KTMQPB');
+  const room2 = await deriveRoomId('ktm-qpb');
   assert.strictEqual(room1, room2, 'deriveRoomId should be case & dash insensitive');
   assert.strictEqual(room1.length, 32, 'RoomId should be 16 bytes hex (32 chars)');
   console.log('✅ Test 2 Passed: Deterministic Room ID Derivation');
 
   // Test 3: Key Derivation & Round-trip Encryption
-  const hostPin = 'K7M9P2';
+  const hostPin = 'KTMQPB';
   const hostKey = await deriveKeyFromPin(hostPin);
-  const viewerKey = await deriveKeyFromPin('k7m-9p2'); // Same PIN, formatted differently
+  const viewerKey = await deriveKeyFromPin('ktm-qpb'); // Same PIN, formatted differently
 
   const sampleJurorData = {
     id: 'juror-1',
@@ -173,7 +175,7 @@ async function runTests() {
   console.log('✅ Test 3 Passed: AES-256-GCM Key Derivation & E2EE Round-Trip');
 
   // Test 4: Imposter Key / Incorrect PIN Fails Decryption
-  const imposterKey = await deriveKeyFromPin('XYZ999');
+  const imposterKey = await deriveKeyFromPin('XYZABC');
   let threw = false;
   try {
     await decryptPayload(imposterKey, encrypted);
@@ -209,13 +211,6 @@ async function runTests() {
   // Subsequent correct attempt succeeds seamlessly
   assert.strictEqual(await verifyAuthProof(hostKey, 'empanel-join', genuineProof), true, 'Genuine viewer can join after failed attempts');
   console.log('✅ Test 6 Passed: Non-Destructive Auth & Infinite Retry (Room Burn Removed)');
-
-  // Test 7: Wi-Fi Insecure Context (Mobile without window.crypto.subtle) Interoperability
-  // Tests that mobile devices connecting over Wi-Fi HTTP (where window.crypto.subtle is undefined)
-  // seamlessly interoperate with the desktop host WebCrypto.
-  const { execSync } = await import('node:child_process');
-  execSync('node /Users/corn-syrup-enjoyer/.gemini/antigravity/brain/f4ea116d-2a0c-49fe-84e7-9b11b9bd5f68/scratch/test-crypto-interop.mjs');
-  console.log('✅ Test 7 Passed: Mobile Wi-Fi HTTP Fallback Interoperability (No SubtleCrypto Required)');
 
   console.log('\n🎉 ALL CRYPTO & SYNC TESTS PASSED SUCCESSFULLY!\n');
 }

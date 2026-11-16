@@ -9,6 +9,7 @@ import { StrikeConsoleModal } from './components/modals/StrikeConsoleModal';
 import { CaseSettingsModal } from './components/modals/CaseSettingsModal';
 import { NewCaseModal } from './components/modals/NewCaseModal';
 import { PairSessionModal } from './components/modals/PairSessionModal';
+import { SessionEndedModal } from './components/modals/SessionEndedModal';
 import { PodiumView } from './components/podium/PodiumView';
 import { WhisperInputBar } from './components/podium/WhisperInputBar';
 import { normalizePin, isValidPin } from './sync/crypto';
@@ -33,7 +34,7 @@ const CourtroomWorkspace: React.FC = () => {
         if (isValidPin(clean)) {
           const newUrl = window.location.pathname;
           window.history.replaceState({}, '', newUrl);
-          joinSyncSession(clean).catch(err => {
+          joinSyncSession(clean, 'second_chair').catch(err => {
             console.error('Auto-join from URL failed', err);
           });
         }
@@ -46,8 +47,8 @@ const CourtroomWorkspace: React.FC = () => {
     setIsPairOpen(true);
   };
 
-  // Non-host session (or explicit podium mode): render Podium View
-  if (viewMode === 'podium' || syncRole === 'viewer') {
+  // Explicit podium mode: render Podium View
+  if (viewMode === 'podium' || syncRole === 'podium') {
     return (
       <>
         <PodiumView />
@@ -56,6 +57,7 @@ const CourtroomWorkspace: React.FC = () => {
           onClose={() => setIsPairOpen(false)}
           initialTab={pairModalTab}
         />
+        <SessionEndedModal />
       </>
     );
   }
@@ -101,6 +103,7 @@ const CourtroomWorkspace: React.FC = () => {
         onClose={() => setIsPairOpen(false)}
         initialTab={pairModalTab}
       />
+      <SessionEndedModal />
     </div>
   );
 };

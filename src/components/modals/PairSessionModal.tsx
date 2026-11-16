@@ -15,7 +15,9 @@ import {
   Wifi,
   Lock,
   ArrowRight,
-  QrCode
+  QrCode,
+  Scale,
+  LayoutGrid
 } from 'lucide-react';
 
 interface PairSessionModalProps {
@@ -35,6 +37,7 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
     syncPin,
     syncAttempts,
     syncLatency,
+    connectedPeers,
     startHostingSync,
     joinSyncSession,
     burnSyncRoom,
@@ -42,6 +45,7 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
   } = useCase();
 
   const [tab, setTab] = useState<'host' | 'viewer'>(initialTab);
+  const [selectedJoinRole, setSelectedJoinRole] = useState<'second_chair' | 'podium'>('second_chair');
   const [inputPin, setInputPin] = useState('');
   const [copied, setCopied] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -183,18 +187,18 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
     e.preventDefault();
     const clean = normalizePin(inputPin);
     if (!isValidPin(clean)) {
-      setErrorMessage('Please enter a valid 6-character alphanumeric PIN');
+      setErrorMessage('Please enter a valid 6-letter PIN (letters only)');
       return;
     }
 
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
-      await joinSyncSession(clean);
+      await joinSyncSession(clean, selectedJoinRole);
       // Let the isNowConnected effect auto-close the modal upon handshake completion
     } catch (e: any) {
       setIsSubmitting(false);
-      setErrorMessage(e?.message || 'Failed to connect with Second Chair');
+      setErrorMessage(e?.message || 'Failed to connect with host session');
     }
   };
 
@@ -271,7 +275,7 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
             }`}
           >
             <Radio className="w-4 h-4 text-amber-400" />
-            <span>View (Enter PIN)</span>
+            <span>Join Session (Enter PIN)</span>
           </button>
         </div>
 
@@ -283,22 +287,50 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
               {syncPin ? (
                 /* Host PIN Active (Keeps showing PIN and QR even when peers connect) */
                 <div className="space-y-4">
-                  {/* Connected Status Banner */}
+                  {/* Connected Status Banner & Peer List */}
                   {isConnected && (
-                    <div className="bg-emerald-950/50 border border-emerald-500/40 rounded-xl px-4 py-2.5 flex items-center justify-between animate-in fade-in">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-xs font-bold text-emerald-300">
-                          Session Connected & Syncing
-                        </span>
+                    <div className="bg-emerald-950/50 border border-emerald-500/40 rounded-xl p-3 space-y-2 animate-in fade-in">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span className="text-xs font-bold text-emerald-300">
+                            {connectedPeers.length > 1
+                              ? `${connectedPeers.length - 1} Devices Connected`
+                              : 'Session Active & Syncing'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={disconnectSync}
+                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-rose-300 border border-slate-700 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          End Session
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={disconnectSync}
-                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-rose-300 border border-slate-700 rounded-lg text-xs font-medium transition-colors"
-                      >
-                        Disconnect All
-                      </button>
+
+                      {/* Peer List Badges */}
+                      {connectedPeers.length > 1 && (
+                        <div className="flex flex-wrap gap-1.5 pt-1 border-t border-emerald-500/20">
+                          {connectedPeers.map(peer => (
+                            <span
+                              key={peer.id}
+                              className={`text-[10px] font-mono px-2 py-0.5 rounded-md border ${
+                                peer.role === 'host'
+                                  ? 'bg-slate-800 border-slate-650 text-slate-300'
+                                  : peer.role === 'second_chair'
+                                  ? 'bg-indigo-900/60 border-indigo-500/50 text-indigo-200'
+                                  : 'bg-amber-900/60 border-amber-500/50 text-amber-200'
+                              }`}
+                            >
+                              {peer.role === 'host'
+                                ? '★ Host'
+                                : peer.role === 'second_chair'
+                                ? '2nd Chair (Table)'
+                                : '1st Chair (Podium)'}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -392,29 +424,73 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
               )}
             </div>
           ) : (
-            /* VIEWER (Podium) */
+            /* JOIN SESSION (Second Chair or Podium) */
             <form onSubmit={handleJoin} className="space-y-4">
               <div className="space-y-3">
                 <label className="text-xs font-semibold text-slate-300 block">
-                  Enter 6-Character PIN from Second Chair:
+                  Enter 6-Letter PIN from Host Console:
                 </label>
                 <input
                   ref={pinInputRef}
                   type="text"
                   maxLength={7}
-                  placeholder="------"
+                  placeholder="ABC-DEF"
                   value={inputPin}
                   onChange={(e) => {
-                    const raw = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+                    const raw = e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase();
                     if (raw.length <= 6) {
                       setInputPin(raw.length > 3 ? `${raw.slice(0, 3)}-${raw.slice(3)}` : raw);
                     }
                   }}
-                  className="w-full px-4 py-3 bg-slate-950 border-2 border-slate-700 focus:border-amber-500 rounded-xl font-mono text-center text-3xl tracking-widest text-amber-300 focus:outline-none focus:ring-4 focus:ring-amber-500/20"
+                  className="w-full px-4 py-3 bg-slate-950 border-2 border-slate-700 focus:border-indigo-500 rounded-xl font-mono text-center text-3xl tracking-widest text-indigo-300 focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
                 />
                 <p className="text-xs text-slate-400 text-center">
-                  Look at the Second Chair screen to find the 6-character PIN or scan the QR code.
+                  Look at the host screen to find the 6-letter PIN or scan the QR code.
                 </p>
+              </div>
+
+              {/* Role Selection */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-xs font-semibold text-slate-300 block">
+                  Select Your Role for this Session:
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedJoinRole('second_chair')}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      selectedJoinRole === 'second_chair'
+                        ? 'bg-indigo-600/20 border-indigo-500 text-indigo-100 ring-1 ring-indigo-500/50'
+                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-1.5 font-bold text-xs text-indigo-300 mb-1">
+                      <Scale className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Second Chair</span>
+                    </div>
+                    <p className="text-[10px] leading-tight text-slate-400">
+                      Full table console: ratings, strikes, notes & seating chart
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedJoinRole('podium')}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      selectedJoinRole === 'podium'
+                        ? 'bg-amber-600/20 border-amber-500 text-amber-100 ring-1 ring-amber-500/50'
+                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-1.5 font-bold text-xs text-amber-300 mb-1">
+                      <Radio className="w-3.5 h-3.5 text-amber-400" />
+                      <span>First Chair (Podium)</span>
+                    </div>
+                    <p className="text-[10px] leading-tight text-slate-400">
+                      Glanceable lectern view with giant juror cards & whisper cues
+                    </p>
+                  </button>
+                </div>
               </div>
 
               {errorMessage && (
@@ -427,16 +503,20 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting || normalizePin(inputPin).length !== 6}
-                className="w-full py-3.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 disabled:opacity-40 text-white font-semibold rounded-xl text-sm shadow-lg shadow-amber-600/30 transition-all flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 disabled:opacity-40 text-white font-semibold rounded-xl text-sm shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Connecting & Opening Podium Mode...</span>
+                    <span>Connecting to Courtroom Session...</span>
                   </>
                 ) : (
                   <>
-                    <span>Connect & Open Podium Mode</span>
+                    <span>
+                      {selectedJoinRole === 'second_chair'
+                        ? 'Connect as Second Chair (Table Console)'
+                        : 'Connect as First Chair (Podium View)'}
+                    </span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
