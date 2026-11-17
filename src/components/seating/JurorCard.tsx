@@ -298,21 +298,6 @@ export const JurorCard: React.FC<JurorCardProps> = ({
     }
   };
 
-  // Favorability styling for unseated jury pool cards matching Podium View outlines
-  let poolFavorabilityStyle = 'bg-slate-900 border-slate-800 hover:border-slate-650 hover:bg-slate-850 shadow-sm';
-  if (!isSeated) {
-    const rating = juror.rating || 0;
-    if (rating > 0) {
-      poolFavorabilityStyle = rating >= 2
-        ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-950/20 hover:bg-emerald-950/30'
-        : 'border-emerald-500/60 bg-emerald-950/20 hover:bg-emerald-950/30';
-    } else if (rating < 0) {
-      poolFavorabilityStyle = rating <= -2
-        ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-950/20 hover:bg-rose-950/30'
-        : 'border-rose-500/60 bg-rose-950/20 hover:bg-rose-950/30';
-    }
-  }
-
   const calculatedAge = juror.age || calculateAgeFromBirthYear(juror.birthYear);
 
   return (
@@ -339,7 +324,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
           ? 'bg-indigo-950/80 border-indigo-400 ring-2 ring-indigo-400/50 shadow-lg shadow-indigo-950/50'
           : isStruck
           ? 'bg-slate-900/40 border-slate-800/80 opacity-60 hover:opacity-100 hover:bg-slate-900/70'
-          : poolFavorabilityStyle
+          : 'bg-slate-900 border-slate-800 hover:border-slate-650 hover:bg-slate-850 shadow-sm'
       }`}
     >
       {/* Header: Seat / Juror # + Status / Rating */}
@@ -357,7 +342,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
 
         <div className="flex items-center space-x-1.5">
           {getStatusBadge()}
-          {isSeated && getRatingBadge(juror.rating)}
+          {getRatingBadge(juror.rating)}
         </div>
       </div>
 
