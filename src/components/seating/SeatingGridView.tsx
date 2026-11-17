@@ -22,12 +22,14 @@ export const SeatingGridView: React.FC = () => {
     jurors,
     updateActiveCase,
     reorderGalleryJurors,
+    moveJurorToGallerySpot,
   } = useCase();
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'positive' | 'negative' | 'struck'>('all');
   const [draggedJurorId, setDraggedJurorId] = useState<string | null>(null);
   const [dragOverJurorId, setDragOverJurorId] = useState<string | null>(null);
+  const [dragOverEmptyIndex, setDragOverEmptyIndex] = useState<number | null>(null);
   const [swappedJurorIds, setSwappedJurorIds] = useState<string[]>([]);
 
   if (!activeCase) return null;
@@ -39,21 +41,40 @@ export const SeatingGridView: React.FC = () => {
   // Column splits: either 1 bank (none) or 2 banks (1 central)
   const splits: number[] = getColumnSplits(gridCols, gutters);
 
-  // Determine full juror sequence in the gallery
-  // If custom galleryOrder is present, respect it; otherwise sort by jurorNumber
-  const sortedJurors = [...jurors].sort((a, b) => {
-    if (activeCase.galleryOrder && activeCase.galleryOrder.length > 0) {
-      const idxA = activeCase.galleryOrder.indexOf(a.id);
-      const idxB = activeCase.galleryOrder.indexOf(b.id);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
+  // Determine full juror sequence in the gallery with empty spots support
+  const jurorsMap = new Map(jurors.map(j => [j.id, j]));
+  const galleryOrder = activeCase.galleryOrder;
+  let slotJurors: (Juror | null)[] = [];
+
+  if (galleryOrder && galleryOrder.length > 0) {
+    slotJurors = galleryOrder.map(id => (id ? jurorsMap.get(id) || null : null));
+    const placedIds = new Set(galleryOrder.filter(Boolean));
+    const unplacedJurors = jurors
+      .filter(j => !placedIds.has(j.id))
+      .sort((a, b) => {
+        const numA = parseInt(a.jurorNumber, 10);
+        const numB = parseInt(b.jurorNumber, 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.jurorNumber.localeCompare(b.jurorNumber);
+      });
+    let unplacedIdx = 0;
+    for (let i = 0; i < slotJurors.length && unplacedIdx < unplacedJurors.length; i++) {
+      if (slotJurors[i] === null) {
+        slotJurors[i] = unplacedJurors[unplacedIdx++];
+      }
     }
-    const numA = parseInt(a.jurorNumber, 10);
-    const numB = parseInt(b.jurorNumber, 10);
-    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-    return a.jurorNumber.localeCompare(b.jurorNumber);
-  });
+    while (unplacedIdx < unplacedJurors.length) {
+      slotJurors.push(unplacedJurors[unplacedIdx++]);
+    }
+  } else {
+    const sorted = [...jurors].sort((a, b) => {
+      const numA = parseInt(a.jurorNumber, 10);
+      const numB = parseInt(b.jurorNumber, 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.jurorNumber.localeCompare(b.jurorNumber);
+    });
+    slotJurors = sorted;
+  }
 
   // Filter matcher (determines if juror is highlighted or dimmed)
   const matchesFilter = (j: Juror): boolean => {
@@ -73,18 +94,22 @@ export const SeatingGridView: React.FC = () => {
     return true;
   };
 
-  // Group jurors into rows without moving seats!
-  const numRows = Math.max(1, Math.ceil(sortedJurors.length / gridCols));
+  // Group jurors into rows with fixed slots
+  const numRows = Math.max(1, Math.ceil(slotJurors.length / gridCols));
+  const totalSlots = numRows * gridCols;
+  while (slotJurors.length < totalSlots) {
+    slotJurors.push(null);
+  }
 
-  const rowsData: { rowNumber: number; jurors: (Juror | null)[] }[] = [];
+  const rowsData: { rowNumber: number; slots: { juror: Juror | null; slotIndex: number }[] }[] = [];
   for (let r = 0; r < numRows; r++) {
     const startIdx = r * gridCols;
-    const rowJurors: (Juror | null)[] = [];
+    const rowSlots: { juror: Juror | null; slotIndex: number }[] = [];
     for (let c = 0; c < gridCols; c++) {
-      const jIdx = startIdx + c;
-      rowJurors.push(jIdx < sortedJurors.length ? sortedJurors[jIdx] : null);
+      const idx = startIdx + c;
+      rowSlots.push({ juror: slotJurors[idx], slotIndex: idx });
     }
-    rowsData.push({ rowNumber: r + 1, jurors: rowJurors });
+    rowsData.push({ rowNumber: r + 1, slots: rowSlots });
   }
 
   // Courtroom perspective:
@@ -129,6 +154,18 @@ export const SeatingGridView: React.FC = () => {
     setDragOverJurorId(null);
   };
 
+  const handleEmptySlotDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData('text/plain') || draggedJurorId;
+    if (sourceId) {
+      moveJurorToGallerySpot(sourceId, targetIndex);
+      setSwappedJurorIds([sourceId]);
+      setTimeout(() => setSwappedJurorIds([]), 800);
+    }
+    setDraggedJurorId(null);
+    setDragOverEmptyIndex(null);
+  };
+
   const handleResetGalleryOrder = () => {
     updateActiveCase({ galleryOrder: undefined });
   };
@@ -143,7 +180,7 @@ export const SeatingGridView: React.FC = () => {
             <h2 className="text-sm font-bold tracking-wide uppercase text-slate-200 flex items-center space-x-2">
               <span>Venire Gallery Grid</span>
               <span className="text-xs px-2 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">
-                {sortedJurors.length} Total
+                {jurors.length} Total
               </span>
             </h2>
             <div className="text-[11px] text-slate-400 flex items-center space-x-1.5 mt-0.5">
@@ -276,7 +313,7 @@ export const SeatingGridView: React.FC = () => {
       </div>
 
       {/* Grid Canvas */}
-      {sortedJurors.length === 0 ? (
+      {jurors.length === 0 ? (
         <div className="py-16 text-center text-slate-500 text-xs bg-slate-900/40 border border-slate-800/80 rounded-2xl">
           No jurors found. Use the "Intake" button at the top to import or create prospective jurors.
         </div>
@@ -320,7 +357,7 @@ export const SeatingGridView: React.FC = () => {
                   {/* Row Banks with Static Clean Vertical Aisles */}
                   <div className="flex-1 flex items-center space-x-2 min-w-[700px]">
                     {splits.map((bankCols, bankIdx) => {
-                      const bankJurors = row.jurors.slice(colOffset, colOffset + bankCols);
+                      const bankSlots = row.slots.slice(colOffset, colOffset + bankCols);
                       colOffset += bankCols;
 
                       return (
@@ -341,12 +378,23 @@ export const SeatingGridView: React.FC = () => {
                               gridTemplateColumns: `repeat(${bankCols}, minmax(130px, 1fr))`,
                             }}
                           >
-                            {bankJurors.map((juror, seatIdx) => {
+                            {bankSlots.map((slot) => {
+                              const { juror, slotIndex } = slot;
                               if (!juror) {
                                 return (
                                   <div
-                                    key={seatIdx}
-                                    className="h-[105px] rounded-xl border border-dashed border-slate-850/60 bg-slate-950/20 flex items-center justify-center text-slate-700 text-[10px]"
+                                    key={`empty-${slotIndex}`}
+                                    onDragOver={(e) => {
+                                      e.preventDefault();
+                                      setDragOverEmptyIndex(slotIndex);
+                                    }}
+                                    onDragLeave={() => setDragOverEmptyIndex(null)}
+                                    onDrop={(e) => handleEmptySlotDrop(e, slotIndex)}
+                                    className={`h-[105px] rounded-xl border border-dashed flex items-center justify-center text-slate-700 text-[10px] transition-all ${
+                                      dragOverEmptyIndex === slotIndex
+                                        ? 'border-indigo-500/80 bg-indigo-950/30'
+                                        : 'border-slate-850/60 bg-slate-950/20'
+                                    }`}
                                   >
                                     Empty
                                   </div>

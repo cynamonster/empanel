@@ -81,8 +81,8 @@ export function mapRowsToJurors(matrix: string[][], caseId: string): Juror[] {
     headers = firstRow;
     dataRows = matrix.slice(1);
   } else {
-    // Synthetic headers based on common 1-indexed format: No, Name, Occupation, Age
-    headers = ['Juror #', 'Full Name', 'Occupation', 'Age', 'Area of County'];
+    // Synthetic headers based on common 1-indexed format: Juror #, Full Name, Occupation, Age, Gender, Area of County
+    headers = ['Juror #', 'Full Name', 'Occupation', 'Age', 'Gender', 'Area of County'];
     dataRows = matrix;
   }
 

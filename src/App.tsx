@@ -15,7 +15,7 @@ import { WhisperInputBar } from './components/podium/WhisperInputBar';
 import { normalizePin, isValidPin } from './sync/crypto';
 
 const CourtroomWorkspace: React.FC = () => {
-  const { viewMode, syncRole, syncStatus, joinSyncSession } = useCase();
+  const { viewMode, syncRole, syncStatus, connectedPeers, joinSyncSession } = useCase();
 
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
   const [isStrikeConsoleOpen, setIsStrikeConsoleOpen] = useState(false);
@@ -88,8 +88,8 @@ const CourtroomWorkspace: React.FC = () => {
         <JurorDetailDrawer />
       </div>
 
-      {/* Second Chair Whisper Input & Live Sync Status Bar (only visible when connected) */}
-      {(syncStatus === 'connected_p2p' || syncStatus === 'connected_relay') && (
+      {/* Second Chair Whisper Input & Live Sync Status Bar (only visible when a podium viewer is connected) */}
+      {(syncStatus === 'connected_p2p' || syncStatus === 'connected_relay') && connectedPeers.some(p => p.role === 'podium') && (
         <WhisperInputBar onOpenPairModal={handleOpenPairModal} />
       )}
 

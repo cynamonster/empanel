@@ -15,6 +15,32 @@ interface JurorCardProps {
   onDrop?: (e: React.DragEvent) => void;
 }
 
+export function formatJurorDisplayName(juror: { fullName?: string; gender?: string; jurorNumber?: string }): string {
+  if (!juror.fullName) return `Juror #${juror.jurorNumber || ''}`;
+  const trimmed = juror.fullName.trim();
+  const parts = trimmed.split(/\s+/);
+  const lastName = parts[parts.length - 1];
+
+  const g = juror.gender?.trim().toLowerCase();
+  let prefix = '';
+  if (g === 'male' || g === 'm') {
+    prefix = 'Mr.';
+  } else if (g === 'female' || g === 'f') {
+    prefix = 'Ms.';
+  }
+
+  if (prefix) {
+    return `${prefix} ${lastName}`;
+  }
+
+  if (/^(mr|mrs|ms|dr)\.?/i.test(parts[0])) {
+    const title = parts[0].replace(/\.?$/, '.');
+    return `${title} ${lastName}`;
+  }
+
+  return lastName || trimmed;
+}
+
 export const JurorCard: React.FC<JurorCardProps> = ({
   juror,
   compact = false,
@@ -316,12 +342,12 @@ export const JurorCard: React.FC<JurorCardProps> = ({
         </div>
       </div>
 
-      {/* Full Name */}
-      <div className="text-sm font-semibold text-slate-200 truncate group-hover:text-white">
-        {juror.fullName || `Juror #${juror.jurorNumber}`}
+      {/* Display Name: Mr/Ms LASTNAME */}
+      <div className="text-sm font-semibold text-slate-200 truncate group-hover:text-white" title={juror.fullName}>
+        {formatJurorDisplayName(juror)}
       </div>
 
-      {/* Demographics / Details */}
+      {/* Demographics / Details (gender dropped from card) */}
       {!compact && (
         <div className="mt-1 space-y-0.5 text-xs text-slate-400">
           <div className="truncate flex items-center space-x-1">
@@ -329,7 +355,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
           </div>
           <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5 gap-1">
             <span className="truncate">
-              {[juror.age ? `${juror.age}y` : null, juror.gender, juror.raceEthnicity]
+              {[juror.age ? `${juror.age}y` : null, juror.raceEthnicity]
                 .filter(Boolean)
                 .join(' • ')}
             </span>

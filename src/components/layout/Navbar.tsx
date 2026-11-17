@@ -17,7 +17,6 @@ import {
   Radio,
   Maximize2
 } from 'lucide-react';
-import { Tooltip } from '../common/Tooltip';
 
 interface NavbarProps {
   onOpenIntake: () => void;
@@ -45,6 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     peremptoryStrikes,
     activeQuestionId,
     setActiveQuestionId,
+    toggleQuestionLogger,
     loadDemoCase,
     canUndo,
     canRedo,
@@ -59,11 +59,13 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const [showCaseMenu, setShowCaseMenu] = useState(false);
 
-  // Peremptory strikes stats
+  // Peremptory strikes stats (supports soft cap and court-granted supplemental strikes)
   const plaintiffStrikesUsed = peremptoryStrikes.filter(s => s.side === 'plaintiff_prosecution').length;
   const defenseStrikesUsed = peremptoryStrikes.filter(s => s.side === 'defense').length;
-  const pRemaining = Math.max(0, (activeCase?.plaintiffStrikesAllowed || 3) - plaintiffStrikesUsed);
-  const dRemaining = Math.max(0, (activeCase?.defenseStrikesAllowed || 3) - defenseStrikesUsed);
+  const pAllowed = activeCase?.plaintiffStrikesAllowed || 3;
+  const dAllowed = activeCase?.defenseStrikesAllowed || 3;
+  const pRemaining = pAllowed - plaintiffStrikesUsed;
+  const dRemaining = dAllowed - defenseStrikesUsed;
 
   return (
     <header data-navbar="true" className="bg-slate-900 border-b border-slate-800 text-slate-100 px-2 sm:px-4 py-2.5 flex items-center justify-between shadow-md relative z-30">
@@ -161,64 +163,69 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3 overflow-x-auto min-w-0">
         {/* Undo & Redo History Controls */}
         <div className="flex items-center space-x-0.5 bg-slate-800 p-0.5 rounded-lg border border-slate-700 flex-shrink-0">
-          <Tooltip content="Undo (Ctrl+Z / ⌘Z)" side="bottom">
-            <button
-              disabled={!canUndo}
-              onClick={() => undo()}
-              className="p-1.5 rounded text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-300 transition-colors"
-              title="Undo (Ctrl+Z / ⌘Z)"
-            >
-              <Undo2 className="w-3.5 h-3.5" />
-            </button>
-          </Tooltip>
-          <Tooltip content="Redo (Ctrl+Shift+Z / ⌘⇧Z)" side="bottom">
-            <button
-              disabled={!canRedo}
-              onClick={() => redo()}
-              className="p-1.5 rounded text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-300 transition-colors"
-              title="Redo (Ctrl+Shift+Z / ⌘⇧Z)"
-            >
-              <Redo2 className="w-3.5 h-3.5" />
-            </button>
-          </Tooltip>
+          <button
+            disabled={!canUndo}
+            onClick={() => undo()}
+            className="p-1.5 rounded text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-300 transition-colors"
+            title="Undo (Ctrl+Z / ⌘Z)"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            disabled={!canRedo}
+            onClick={() => redo()}
+            className="p-1.5 rounded text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-300 transition-colors"
+            title="Redo (Ctrl+Shift+Z / ⌘⇧Z)"
+          >
+            <Redo2 className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* Live Strike Tally Badge */}
-        {/* <Tooltip content="Open Strategic Strike Console" side="bottom"> */}
-          <button
-            // onClick={onOpenStrikeConsole}
-            className="flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-xs transition-colors flex-shrink-0"
-            // title="Open Strategic Strike Console"
-            style={{ cursor: 'default' }}
-          >
+        <button
+          className="flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-xs transition-colors flex-shrink-0"
+          style={{ cursor: 'default' }}
+        >
             <Gavel className="w-3.5 h-3.5 text-amber-400" />
             <div className="flex items-center space-x-1.5 sm:space-x-2">
               <span className="font-semibold text-slate-300 hidden md:inline">Strikes:</span>
-              <span
-                className="text-rose-400 font-mono font-medium"
-                title={`${activeCase?.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'} Remaining`}
-              >
-                {activeCase?.caseType === 'criminal' ? 'Pros' : 'P'}: {pRemaining}/{activeCase?.plaintiffStrikesAllowed || 3}
-              </span>
+              {pRemaining < 0 ? (
+                <span
+                  className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded font-mono font-bold text-[11px]"
+                  title={`${activeCase?.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'}: Extra (+${Math.abs(pRemaining)}) strikes granted by court`}
+                >
+                  {activeCase?.caseType === 'criminal' ? 'Pros' : 'P'}: Extra (+{Math.abs(pRemaining)})
+                </span>
+              ) : (
+                <span
+                  className={`font-mono font-medium ${pRemaining === 0 ? 'text-amber-400 font-semibold' : 'text-rose-400'}`}
+                  title={`${activeCase?.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'} Remaining: ${pRemaining} of ${pAllowed}${pRemaining === 0 ? ' (0 remaining, next is excess)' : ''}`}
+                >
+                  {activeCase?.caseType === 'criminal' ? 'Pros' : 'P'}: {pRemaining}/{pAllowed}
+                </span>
+              )}
               <span className="text-slate-600">|</span>
-              <span className="text-blue-400 font-mono font-medium" title="Defense Remaining">
-                Def: {dRemaining}/{activeCase?.defenseStrikesAllowed || 3}
-              </span>
+              {dRemaining < 0 ? (
+                <span
+                  className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded font-mono font-bold text-[11px]"
+                  title={`Defense: Extra (+${Math.abs(dRemaining)}) strikes granted by court`}
+                >
+                  Def: Extra (+{Math.abs(dRemaining)})
+                </span>
+              ) : (
+                <span
+                  className={`font-mono font-medium ${dRemaining === 0 ? 'text-amber-400 font-semibold' : 'text-blue-400'}`}
+                  title={`Defense Remaining: ${dRemaining} of ${dAllowed}${dRemaining === 0 ? ' (0 remaining, next is excess)' : ''}`}
+                >
+                  Def: {dRemaining}/{dAllowed}
+                </span>
+              )}
             </div>
           </button>
-        {/* </Tooltip> */}
 
         {/* Group Question Mode Toggle */}
         <button
-          onClick={() => {
-            if (activeQuestionId) {
-              setActiveQuestionId(null);
-            } else if (questions.length > 0) {
-              setActiveQuestionId(questions[0].id);
-            } else {
-              setActiveQuestionId('new');
-            }
-          }}
+          onClick={toggleQuestionLogger}
           className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors flex-shrink-0 ${
             activeQuestionId
               ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 ring-2 ring-amber-500/30 animate-pulse'

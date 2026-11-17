@@ -41,6 +41,8 @@ export const SeatingBoxView: React.FC = () => {
     toggleAutoFillPanel,
     updateActiveCase,
     reorderGalleryJurors,
+    moveJurorToGallerySpot,
+    peremptoryStrikes,
   } = useCase();
 
   const [search, setSearch] = useState('');
@@ -50,6 +52,7 @@ export const SeatingBoxView: React.FC = () => {
   const [draggedJurorId, setDraggedJurorId] = useState<string | null>(null);
   const [dragOverSeat, setDragOverSeat] = useState<string | null>(null);
   const [dragOverGalleryId, setDragOverGalleryId] = useState<string | null>(null);
+  const [dragOverEmptyIndex, setDragOverEmptyIndex] = useState<number | null>(null);
   const [swappedJurorIds, setSwappedJurorIds] = useState<string[]>([]);
   const [slidingJurorIds, setSlidingJurorIds] = useState<string[]>([]);
 
@@ -170,6 +173,15 @@ export const SeatingBoxView: React.FC = () => {
   const gutters = (activeCase.galleryGutters === 'none' ? 'none' : '1') as 'none' | '1';
   const origin = activeCase.galleryOrigin || 'bottom-left';
 
+  // Peremptory strike tracking (supports soft cap and court-granted supplemental strikes)
+  const plaintiffStrikesUsed = peremptoryStrikes.filter(s => s.side === 'plaintiff_prosecution').length;
+  const defenseStrikesUsed = peremptoryStrikes.filter(s => s.side === 'defense').length;
+  const pAllowed = activeCase.plaintiffStrikesAllowed ?? 3;
+  const dAllowed = activeCase.defenseStrikesAllowed ?? 3;
+  const pRemaining = pAllowed - plaintiffStrikesUsed;
+  const dRemaining = dAllowed - defenseStrikesUsed;
+  const plaintiffLabel = activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff';
+
   // Section 1 Row Calculation:
   // Regardless of how many jurors a panel has, fill every slot in div.mb-2 (up to 6)
   // before moving onto div.mb-4 and so on!
@@ -232,11 +244,12 @@ export const SeatingBoxView: React.FC = () => {
     e.dataTransfer.setData('text/plain', jurorId);
   };
 
-  const handleSeatDrop = (seatNum: number, isAlt: boolean) => {
-    if (draggedJurorId) {
+  const handleSeatDrop = (seatNum: number, isAlt: boolean, e?: React.DragEvent) => {
+    const sourceId = e?.dataTransfer?.getData('text/plain') || draggedJurorId;
+    if (sourceId) {
       const existing = isAlt ? alternateMap.get(seatNum) : seatedMap.get(seatNum);
-      assignSeat(draggedJurorId, seatNum, isAlt);
-      const affected = [draggedJurorId];
+      assignSeat(sourceId, seatNum, isAlt);
+      const affected = [sourceId];
       if (existing) affected.push(existing.id);
       setSwappedJurorIds(affected);
       setTimeout(() => setSwappedJurorIds([]), 800);
@@ -257,38 +270,73 @@ export const SeatingBoxView: React.FC = () => {
     setDragOverGalleryId(null);
   };
 
+  const handleGalleryEmptyDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData('text/plain') || draggedJurorId;
+    if (sourceId) {
+      moveJurorToGallerySpot(sourceId, targetIndex);
+      setSwappedJurorIds([sourceId]);
+      setTimeout(() => setSwappedJurorIds([]), 800);
+    }
+    setDraggedJurorId(null);
+    setDragOverEmptyIndex(null);
+  };
+
   // Section 2 Gallery Calculations:
   const splits: number[] = getColumnSplits(gridCols, gutters);
 
-  const sortedJurors = [...jurors].sort((a, b) => {
-    if (activeCase.galleryOrder && activeCase.galleryOrder.length > 0) {
-      const idxA = activeCase.galleryOrder.indexOf(a.id);
-      const idxB = activeCase.galleryOrder.indexOf(b.id);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-    }
-    const numA = parseInt(a.jurorNumber, 10);
-    const numB = parseInt(b.jurorNumber, 10);
-    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-    return a.jurorNumber.localeCompare(b.jurorNumber);
-  });
+  const jurorsMap = new Map(jurors.map(j => [j.id, j]));
+  const galleryOrder = activeCase.galleryOrder;
+  let slotJurors: (Juror | null)[] = [];
 
-  const numRows = Math.max(1, Math.ceil(sortedJurors.length / gridCols));
-  const rowsData: { rowNumber: number; jurors: (Juror | null)[] }[] = [];
+  if (galleryOrder && galleryOrder.length > 0) {
+    slotJurors = galleryOrder.map(id => (id ? jurorsMap.get(id) || null : null));
+    const placedIds = new Set(galleryOrder.filter(Boolean));
+    const unplacedJurors = jurors
+      .filter(j => !placedIds.has(j.id))
+      .sort((a, b) => {
+        const numA = parseInt(a.jurorNumber, 10);
+        const numB = parseInt(b.jurorNumber, 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.jurorNumber.localeCompare(b.jurorNumber);
+      });
+    let unplacedIdx = 0;
+    for (let i = 0; i < slotJurors.length && unplacedIdx < unplacedJurors.length; i++) {
+      if (slotJurors[i] === null) {
+        slotJurors[i] = unplacedJurors[unplacedIdx++];
+      }
+    }
+    while (unplacedIdx < unplacedJurors.length) {
+      slotJurors.push(unplacedJurors[unplacedIdx++]);
+    }
+  } else {
+    const sorted = [...jurors].sort((a, b) => {
+      const numA = parseInt(a.jurorNumber, 10);
+      const numB = parseInt(b.jurorNumber, 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.jurorNumber.localeCompare(b.jurorNumber);
+    });
+    slotJurors = sorted;
+  }
+
+  const numRows = Math.max(1, Math.ceil(slotJurors.length / gridCols));
+  const totalSlots = numRows * gridCols;
+  while (slotJurors.length < totalSlots) {
+    slotJurors.push(null);
+  }
+
+  const rowsData: { rowNumber: number; slots: { juror: Juror | null; slotIndex: number }[] }[] = [];
   for (let r = 0; r < numRows; r++) {
     const startIdx = r * gridCols;
-    const rowJurors: (Juror | null)[] = [];
+    const rowSlots: { juror: Juror | null; slotIndex: number }[] = [];
     for (let c = 0; c < gridCols; c++) {
-      const jIdx = startIdx + c;
-      rowJurors.push(jIdx < sortedJurors.length ? sortedJurors[jIdx] : null);
+      const idx = startIdx + c;
+      rowSlots.push({ juror: slotJurors[idx], slotIndex: idx });
     }
-    // For top-right courtroom perspective (observer in back of court):
-    // Columns flow right-to-left so Juror #1 is in top-right seat
     if (origin === 'top-right') {
-      rowJurors.reverse();
+      rowSlots.reverse();
     }
-    rowsData.push({ rowNumber: r + 1, jurors: rowJurors });
+    rowsData.push({ rowNumber: r + 1, slots: rowSlots });
   }
 
   const displayedRows = origin === 'bottom-left'
@@ -340,6 +388,7 @@ export const SeatingBoxView: React.FC = () => {
           <div className="absolute -top-2.5 -left-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
             <Tooltip content="Struck for Cause" side="top" align="left">
               <button
+                data-strike-action="true"
                 onClick={(e) => {
                   e.stopPropagation();
                   recordCauseChallenge(
@@ -359,36 +408,84 @@ export const SeatingBoxView: React.FC = () => {
           {/* Quick Strike Buttons on top-right hover */}
           <div className="absolute -top-2.5 right-1 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
             <Tooltip
-              content={`Struck Peremptorily (${activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'})`}
+              content={
+                pRemaining > 0
+                  ? `Struck Peremptorily (${plaintiffLabel}) (${pRemaining} remaining)`
+                  : pRemaining === 0
+                  ? `Struck Peremptorily (${plaintiffLabel}) - 0 Remaining (Next is Excess)`
+                  : `Struck Peremptorily (${plaintiffLabel}) - Extra (+${Math.abs(pRemaining)}) [Statutory allotment exceeded]`
+              }
               side="top"
               align="right"
             >
               <button
+                data-strike-action="true"
                 onClick={(e) => {
                   e.stopPropagation();
                   recordPeremptoryStrike(juror.id, 'plaintiff_prosecution');
                 }}
-                className="bg-rose-950 hover:bg-rose-800 border border-rose-600 text-rose-200 rounded-full p-1 shadow transition-colors"
-                title={`Struck Peremptorily (${activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'})`}
+                className={`relative rounded-full p-1 shadow transition-all border ${
+                  pRemaining > 0
+                    ? 'bg-rose-950 hover:bg-rose-800 border-rose-600 text-rose-200 cursor-pointer'
+                    : pRemaining === 0
+                    ? 'bg-amber-950/90 hover:bg-amber-800 border-amber-500 text-amber-200 ring-1 ring-amber-400/50 cursor-pointer'
+                    : 'bg-amber-900 hover:bg-amber-800 border-amber-400 text-amber-100 ring-2 ring-amber-400/70 shadow-lg shadow-amber-950/60 cursor-pointer'
+                }`}
+                title={
+                  pRemaining > 0
+                    ? `Struck Peremptorily (${plaintiffLabel}) (${pRemaining} remaining)`
+                    : pRemaining === 0
+                    ? `Struck Peremptorily (${plaintiffLabel}) - 0 Remaining (Next is Excess)`
+                    : `Struck Peremptorily (${plaintiffLabel}) - Extra (+${Math.abs(pRemaining)})`
+                }
               >
                 <Gavel className="w-3 h-3 text-rose-300" />
+                {pRemaining < 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-slate-950 font-black text-[8px] px-1 rounded-full border border-amber-300 shadow leading-tight">
+                    +{Math.abs(pRemaining)}
+                  </span>
+                )}
               </button>
             </Tooltip>
 
             <Tooltip
-              content="Struck Peremptorily (Defense)"
+              content={
+                dRemaining > 0
+                  ? `Struck Peremptorily (Defense) (${dRemaining} remaining)`
+                  : dRemaining === 0
+                  ? 'Struck Peremptorily (Defense) - 0 Remaining (Next is Excess)'
+                  : `Struck Peremptorily (Defense) - Extra (+${Math.abs(dRemaining)}) [Statutory allotment exceeded]`
+              }
               side="top"
               align="right"
             >
               <button
+                data-strike-action="true"
                 onClick={(e) => {
                   e.stopPropagation();
                   recordPeremptoryStrike(juror.id, 'defense');
                 }}
-                className="bg-blue-950 hover:bg-blue-800 border border-blue-600 text-blue-200 rounded-full p-1 shadow transition-colors"
-                title="Struck Peremptorily (Defense)"
+                className={`relative rounded-full p-1 shadow transition-all border ${
+                  dRemaining > 0
+                    ? 'bg-blue-950 hover:bg-blue-800 border-blue-600 text-blue-200 cursor-pointer'
+                    : dRemaining === 0
+                    ? 'bg-amber-950/90 hover:bg-amber-800 border-amber-500 text-amber-200 ring-1 ring-amber-400/50 cursor-pointer'
+                    : 'bg-amber-900 hover:bg-amber-800 border-amber-400 text-amber-100 ring-2 ring-amber-400/70 shadow-lg shadow-amber-950/60 cursor-pointer'
+                }`}
+                title={
+                  dRemaining > 0
+                    ? `Struck Peremptorily (Defense) (${dRemaining} remaining)`
+                    : dRemaining === 0
+                    ? 'Struck Peremptorily (Defense) - 0 Remaining (Next is Excess)'
+                    : `Struck Peremptorily (Defense) - Extra (+${Math.abs(dRemaining)})`
+                }
               >
                 <Gavel className="w-3 h-3 text-blue-300" />
+                {dRemaining < 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-slate-950 font-black text-[8px] px-1 rounded-full border border-amber-300 shadow leading-tight">
+                    +{Math.abs(dRemaining)}
+                  </span>
+                )}
               </button>
             </Tooltip>
           </div>
@@ -407,7 +504,7 @@ export const SeatingBoxView: React.FC = () => {
         onDragLeave={() => setDragOverSeat(null)}
         onDrop={(e) => {
           e.preventDefault();
-          handleSeatDrop(seatNum, isAlt);
+          handleSeatDrop(seatNum, isAlt, e);
         }}
         className={`h-[105px] border-2 border-dashed rounded-xl p-3 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
           isOver
@@ -693,7 +790,7 @@ export const SeatingBoxView: React.FC = () => {
         </div>
 
         {/* Gallery Benches Canvas */}
-        {sortedJurors.length === 0 ? (
+        {jurors.length === 0 ? (
           <div className="py-12 text-center text-slate-500 text-xs">
             No jurors in gallery. Use the "Intake" button at the top to import a juror roster.
           </div>
@@ -723,7 +820,7 @@ export const SeatingBoxView: React.FC = () => {
                     {(() => {
                       let colOffset = 0;
                       return splits.map((bankWidth, bankIdx) => {
-                        const bankJurors = row.jurors.slice(colOffset, colOffset + bankWidth);
+                        const bankSlots = row.slots.slice(colOffset, colOffset + bankWidth);
                         const isLastBank = bankIdx === splits.length - 1;
                         colOffset += bankWidth;
 
@@ -736,12 +833,23 @@ export const SeatingBoxView: React.FC = () => {
                                 gridTemplateColumns: `repeat(${bankWidth}, minmax(0, 1fr))`
                               }}
                             >
-                              {bankJurors.map((juror, cIdx) => {
+                              {bankSlots.map((slot) => {
+                                const { juror, slotIndex } = slot;
                                 if (!juror) {
                                   return (
                                     <div
-                                      key={`empty-${cIdx}`}
-                                      className="h-[105px] border border-dashed border-slate-850 rounded-xl bg-slate-950/20"
+                                      key={`empty-${slotIndex}`}
+                                      onDragOver={(e) => {
+                                        e.preventDefault();
+                                        setDragOverEmptyIndex(slotIndex);
+                                      }}
+                                      onDragLeave={() => setDragOverEmptyIndex(null)}
+                                      onDrop={(e) => handleGalleryEmptyDrop(e, slotIndex)}
+                                      className={`h-[105px] border border-dashed rounded-xl transition-all ${
+                                        dragOverEmptyIndex === slotIndex
+                                          ? 'border-indigo-500/80 bg-indigo-950/30'
+                                          : 'border-slate-850 bg-slate-950/20'
+                                      }`}
                                     />
                                   );
                                 }
@@ -777,6 +885,7 @@ export const SeatingBoxView: React.FC = () => {
                                       <div className="absolute -top-2.5 -left-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
                                         <Tooltip content="Struck for Cause" side="top" align="left">
                                           <button
+                                            data-strike-action="true"
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               recordCauseChallenge(

@@ -72,7 +72,7 @@ export interface Case {
   galleryGutters?: 'none' | '1';
   galleryOrigin?: 'bottom-left' | 'top-left' | 'top-right';
   customSplits?: number[];
-  galleryOrder?: string[]; // Array of juror IDs to preserve dragged gallery order
+  galleryOrder?: (string | null)[]; // Array of juror IDs or null for empty spots to preserve dragged gallery layout
   autoFillPanel?: boolean; // Auto-prefill and pull in sequentially available jurors
 
   createdAt: number;
@@ -136,6 +136,7 @@ export type SyncStatus =
   | 'idle' 
   | 'hosting' 
   | 'joining' 
+  | 'reconnecting'
   | 'connected_p2p' 
   | 'connected_relay' 
   | 'burned' 

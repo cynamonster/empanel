@@ -177,13 +177,13 @@ export const QuestionLoggerDrawer: React.FC = () => {
       {/* Edit Question Modal */}
       {editingQuestion && (
         <div
-          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-slate-100"
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 overflow-y-auto flex items-center justify-center p-4 text-slate-100 min-h-screen"
           onClick={() => setEditingQuestion(null)}
         >
           <form
             onSubmit={handleEditSubmit}
             onClick={e => e.stopPropagation()}
-            className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4"
+            className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 my-auto relative"
           >
             <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
               <h3 className="font-bold text-slate-100 text-sm flex items-center space-x-2">
@@ -234,13 +234,13 @@ export const QuestionLoggerDrawer: React.FC = () => {
       {/* New Question Modal */}
       {showAddForm && (
         <div
-          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-slate-100"
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 overflow-y-auto flex items-center justify-center p-4 text-slate-100 min-h-screen"
           onClick={() => setShowAddForm(false)}
         >
           <form
             onSubmit={handleCreate}
             onClick={e => e.stopPropagation()}
-            className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4"
+            className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 my-auto relative"
           >
             <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
               <h3 className="font-bold text-slate-100 text-sm flex items-center space-x-2">

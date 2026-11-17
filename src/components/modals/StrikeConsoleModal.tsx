@@ -37,8 +37,8 @@ export const StrikeConsoleModal: React.FC<StrikeConsoleModalProps> = ({ isOpen, 
   const plaintiffStrikes = peremptoryStrikes.filter(s => s.side === 'plaintiff_prosecution');
   const defenseStrikes = peremptoryStrikes.filter(s => s.side === 'defense');
 
-  const pRemaining = Math.max(0, plaintiffAllowed - plaintiffStrikes.length);
-  const dRemaining = Math.max(0, defenseAllowed - defenseStrikes.length);
+  const pRemaining = plaintiffAllowed - plaintiffStrikes.length;
+  const dRemaining = defenseAllowed - defenseStrikes.length;
 
   // Recommendation engine: Find active/seated jurors with negative ratings
   // Priority: Seated jurors with rating < 0, then unseated with rating < 0
@@ -107,58 +107,108 @@ export const StrikeConsoleModal: React.FC<StrikeConsoleModalProps> = ({ isOpen, 
         {/* Big Scoreboard Bar */}
         <div className="grid grid-cols-2 gap-4 py-3">
           {/* Plaintiff / Prosecution */}
-          <div className="bg-slate-950/80 border border-rose-900/60 rounded-xl p-3 flex items-center justify-between">
+          <div className={`bg-slate-950/80 border rounded-xl p-3 flex items-center justify-between ${
+            pRemaining < 0 ? 'border-amber-500/70 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'border-rose-900/60'
+          }`}>
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-rose-400">
-                {activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'} Strikes
+              <div className="flex items-center space-x-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-rose-400">
+                  {activeCase.caseType === 'criminal' ? 'Prosecution' : 'Plaintiff'} Strikes
+                </span>
+                {pRemaining < 0 && (
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    Excess Granted
+                  </span>
+                )}
               </div>
-              <div className="text-xl font-mono font-extrabold text-rose-200 mt-0.5">
-                {pRemaining} Remaining{' '}
+              <div className="text-xl font-mono font-extrabold mt-0.5 flex items-baseline space-x-2">
+                {pRemaining < 0 ? (
+                  <span className="text-amber-400">Extra (+{Math.abs(pRemaining)})</span>
+                ) : (
+                  <span className="text-rose-200">{pRemaining} Remaining</span>
+                )}
                 <span className="text-xs text-slate-500 font-normal">
                   ({plaintiffStrikes.length} of {plaintiffAllowed} used)
                 </span>
               </div>
             </div>
-            <div className="flex space-x-1">
-              {Array.from({ length: plaintiffAllowed }).map((_, idx) => (
-                <div
-                  key={idx}
-                  className={`w-4 h-4 rounded-full border ${
-                    idx < plaintiffStrikes.length
-                      ? 'bg-rose-600 border-rose-400 shadow-sm'
-                      : 'border-slate-700 bg-slate-900'
-                  }`}
-                  title={idx < plaintiffStrikes.length ? 'Strike Used' : 'Strike Available'}
-                />
-              ))}
+            <div className="flex space-x-1 items-center">
+              {Array.from({ length: Math.max(plaintiffAllowed, plaintiffStrikes.length) }).map((_, idx) => {
+                const isExtra = idx >= plaintiffAllowed;
+                const isUsed = idx < plaintiffStrikes.length;
+                return (
+                  <div
+                    key={idx}
+                    className={`w-4 h-4 rounded-full border ${
+                      isExtra
+                        ? 'bg-amber-500 border-amber-300 shadow-sm animate-pulse'
+                        : isUsed
+                        ? 'bg-rose-600 border-rose-400 shadow-sm'
+                        : 'border-slate-700 bg-slate-900'
+                    }`}
+                    title={
+                      isExtra
+                        ? `Supplemental Strike (+${idx - plaintiffAllowed + 1})`
+                        : isUsed
+                        ? 'Strike Used'
+                        : 'Strike Available'
+                    }
+                  />
+                );
+              })}
             </div>
           </div>
 
           {/* Defense */}
-          <div className="bg-slate-950/80 border border-blue-900/60 rounded-xl p-3 flex items-center justify-between">
+          <div className={`bg-slate-950/80 border rounded-xl p-3 flex items-center justify-between ${
+            dRemaining < 0 ? 'border-amber-500/70 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'border-blue-900/60'
+          }`}>
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-blue-400">
-                Defense Strikes
+              <div className="flex items-center space-x-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400">
+                  Defense Strikes
+                </span>
+                {dRemaining < 0 && (
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    Excess Granted
+                  </span>
+                )}
               </div>
-              <div className="text-xl font-mono font-extrabold text-blue-200 mt-0.5">
-                {dRemaining} Remaining{' '}
+              <div className="text-xl font-mono font-extrabold mt-0.5 flex items-baseline space-x-2">
+                {dRemaining < 0 ? (
+                  <span className="text-amber-400">Extra (+{Math.abs(dRemaining)})</span>
+                ) : (
+                  <span className="text-blue-200">{dRemaining} Remaining</span>
+                )}
                 <span className="text-xs text-slate-500 font-normal">
                   ({defenseStrikes.length} of {defenseAllowed} used)
                 </span>
               </div>
             </div>
-            <div className="flex space-x-1">
-              {Array.from({ length: defenseAllowed }).map((_, idx) => (
-                <div
-                  key={idx}
-                  className={`w-4 h-4 rounded-full border ${
-                    idx < defenseStrikes.length
-                      ? 'bg-blue-600 border-blue-400 shadow-sm'
-                      : 'border-slate-700 bg-slate-900'
-                  }`}
-                  title={idx < defenseStrikes.length ? 'Strike Used' : 'Strike Available'}
-                />
-              ))}
+            <div className="flex space-x-1 items-center">
+              {Array.from({ length: Math.max(defenseAllowed, defenseStrikes.length) }).map((_, idx) => {
+                const isExtra = idx >= defenseAllowed;
+                const isUsed = idx < defenseStrikes.length;
+                return (
+                  <div
+                    key={idx}
+                    className={`w-4 h-4 rounded-full border ${
+                      isExtra
+                        ? 'bg-amber-500 border-amber-300 shadow-sm animate-pulse'
+                        : isUsed
+                        ? 'bg-blue-600 border-blue-400 shadow-sm'
+                        : 'border-slate-700 bg-slate-900'
+                    }`}
+                    title={
+                      isExtra
+                        ? `Supplemental Strike (+${idx - defenseAllowed + 1})`
+                        : isUsed
+                        ? 'Strike Used'
+                        : 'Strike Available'
+                    }
+                  />
+                );
+              })}
             </div>
           </div>
         </div>

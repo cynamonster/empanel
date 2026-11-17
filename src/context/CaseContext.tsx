@@ -18,6 +18,8 @@ interface CaseContextValue {
   setSelectedJurorId: (id: string | null) => void;
   activeQuestionId: string | null;
   setActiveQuestionId: (id: string | null) => void;
+  lastSelectedQuestionId: string | null;
+  toggleQuestionLogger: () => void;
   
   searchTerm: string;
   setSearchTerm: (term: string) => void;
@@ -87,6 +89,7 @@ interface CaseContextValue {
 
   // Gallery Dragging & Reordering
   reorderGalleryJurors: (sourceJurorId: string, targetJurorId: string) => Promise<void>;
+  moveJurorToGallerySpot: (sourceJurorId: string, targetIndex: number) => Promise<void>;
   updateAisleSplits: (splits: number[]) => Promise<void>;
 
   // Backup & Import
@@ -106,7 +109,29 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [peremptoryStrikes, setPeremptoryStrikes] = useState<PeremptoryStrikeAction[]>([]);
   
   const [selectedJurorId, setSelectedJurorId] = useState<string | null>(null);
-  const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
+  const [activeQuestionId, setActiveQuestionIdState] = useState<string | null>(null);
+  const [lastSelectedQuestionId, setLastSelectedQuestionId] = useState<string | null>(null);
+
+  const setActiveQuestionId = (id: string | null) => {
+    setActiveQuestionIdState(id);
+    if (id && id !== 'new') {
+      setLastSelectedQuestionId(id);
+    }
+  };
+
+  const toggleQuestionLogger = () => {
+    if (activeQuestionId) {
+      setActiveQuestionIdState(null);
+    } else {
+      if (lastSelectedQuestionId && questions.some(q => q.id === lastSelectedQuestionId)) {
+        setActiveQuestionIdState(lastSelectedQuestionId);
+      } else if (questions.length > 0) {
+        setActiveQuestionIdState(questions[0].id);
+      } else {
+        setActiveQuestionIdState('new');
+      }
+    }
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -690,7 +715,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const oldSeatNumber = juror.seatNumber;
     const oldIsAlternate = juror.isAlternate;
 
-    // Calculate round for this side
+    // Calculate round for this side (supports supplemental / extra strikes granted by court)
     const priorStrikesForSide = peremptoryStrikes.filter(s => s.side === side).length;
     const round = priorStrikesForSide + 1;
 
@@ -1194,7 +1219,12 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!activeCase || sourceJurorId === targetJurorId) return;
     pushSnapshot();
 
-    let order = activeCase.galleryOrder ? [...activeCase.galleryOrder] : [];
+    const sourceJuror = jurors.find(j => j.id === sourceJurorId);
+    if (sourceJuror && sourceJuror.seatNumber !== undefined) {
+      await unseatJuror(sourceJurorId);
+    }
+
+    let order: (string | null)[] = activeCase.galleryOrder ? [...activeCase.galleryOrder] : [];
     if (order.length === 0) {
       const sorted = [...jurors].sort((a, b) => {
         const numA = parseInt(a.jurorNumber, 10);
@@ -1216,6 +1246,40 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       order[tIdx] = temp;
       await updateActiveCase({ galleryOrder: order });
     }
+  };
+
+  const moveJurorToGallerySpot = async (sourceJurorId: string, targetIndex: number) => {
+    if (!activeCase || targetIndex < 0) return;
+    pushSnapshot();
+
+    const sourceJuror = jurors.find(j => j.id === sourceJurorId);
+    if (sourceJuror && sourceJuror.seatNumber !== undefined) {
+      await unseatJuror(sourceJurorId);
+    }
+
+    const sorted = [...jurors].sort((a, b) => {
+      const numA = parseInt(a.jurorNumber, 10);
+      const numB = parseInt(b.jurorNumber, 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.jurorNumber.localeCompare(b.jurorNumber);
+    });
+
+    let order: (string | null)[] = activeCase.galleryOrder ? [...activeCase.galleryOrder] : [];
+    if (order.length === 0) {
+      order = sorted.map(j => j.id);
+    }
+
+    while (order.length <= targetIndex) {
+      order.push(null);
+    }
+
+    const currIdx = order.indexOf(sourceJurorId);
+    if (currIdx !== -1) {
+      order[currIdx] = null;
+    }
+
+    order[targetIndex] = sourceJurorId;
+    await updateActiveCase({ galleryOrder: order });
   };
 
   const updateAisleSplits = async (splits: number[]) => {
@@ -1292,6 +1356,8 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSelectedJurorId,
     activeQuestionId,
     setActiveQuestionId,
+    lastSelectedQuestionId,
+    toggleQuestionLogger,
     searchTerm,
     setSearchTerm,
     statusFilter,
@@ -1343,6 +1409,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearPanel,
     toggleAutoFillPanel,
     reorderGalleryJurors,
+    moveJurorToGallerySpot,
     updateAisleSplits,
   }), [
     cases,
@@ -1353,6 +1420,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     peremptoryStrikes,
     selectedJurorId,
     activeQuestionId,
+    lastSelectedQuestionId,
     searchTerm,
     statusFilter,
     viewMode,

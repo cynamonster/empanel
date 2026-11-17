@@ -16,7 +16,8 @@ import {
   Briefcase,
   GraduationCap,
   FileEdit,
-  MessageSquare
+  MessageSquare,
+  MessageSquarePlus
 } from 'lucide-react';
 import type { Juror } from '../../types';
 
@@ -60,6 +61,7 @@ export const JurorDetailDrawer: React.FC = () => {
     unseatJuror,
     activeQuestionId,
     setActiveQuestionId,
+    toggleQuestionLogger,
   } = useCase();
 
   const [showCauseModal, setShowCauseModal] = useState(false);
@@ -82,7 +84,20 @@ export const JurorDetailDrawer: React.FC = () => {
   const [localNotes, setLocalNotes] = useState(juror?.notes || '');
   const [localStrikeNote, setLocalStrikeNote] = useState(juror?.strikeIntentNote || '');
 
-  // Debounced auto-save for textareas to prevent cursor jump & rerender lag
+  // Local state for demographics to prevent cursor jump on keystroke
+  const [demographics, setDemographics] = useState({
+    fullName: juror?.fullName || '',
+    age: juror?.age !== undefined ? String(juror.age) : '',
+    gender: juror?.gender || '',
+    raceEthnicity: juror?.raceEthnicity || '',
+    areaOfCounty: juror?.areaOfCounty || juror?.cityState || juror?.cityOrZip || '',
+    occupation: juror?.occupation || '',
+  });
+
+  const [editingCommentQId, setEditingCommentQId] = useState<string | null>(null);
+  const [commentDraft, setCommentDraft] = useState('');
+
+  // Debounced auto-save for inputs/textareas to prevent cursor jump & rerender lag
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUpdatesRef = useRef<Partial<Juror>>({});
   const activeJurorIdRef = useRef<string | undefined>(juror?.id);
@@ -107,6 +122,18 @@ export const JurorDetailDrawer: React.FC = () => {
     }, 250);
   };
 
+  const handleDemographicChange = (field: keyof typeof demographics, value: string) => {
+    setDemographics(prev => ({ ...prev, [field]: value }));
+    const updates: Partial<Juror> = {};
+    if (field === 'areaOfCounty') {
+      updates.areaOfCounty = value;
+      updates.cityState = value;
+    } else {
+      updates[field] = value;
+    }
+    scheduleUpdate(updates);
+  };
+
   useEffect(() => {
     if (activeJurorIdRef.current && activeJurorIdRef.current !== juror?.id) {
       flushUpdates(activeJurorIdRef.current);
@@ -115,6 +142,15 @@ export const JurorDetailDrawer: React.FC = () => {
     if (juror) {
       setLocalNotes(juror.notes || '');
       setLocalStrikeNote(juror.strikeIntentNote || '');
+      setDemographics({
+        fullName: juror.fullName || '',
+        age: juror.age !== undefined ? String(juror.age) : '',
+        gender: juror.gender || '',
+        raceEthnicity: juror.raceEthnicity || '',
+        areaOfCounty: juror.areaOfCounty || juror.cityState || juror.cityOrZip || '',
+        occupation: juror.occupation || '',
+      });
+      setEditingCommentQId(null);
     }
 
     // Auto-fit height when switching juror & retain focus if navigated via backtick
@@ -140,35 +176,89 @@ export const JurorDetailDrawer: React.FC = () => {
     });
   }, [juror?.id]);
 
-  // Real-time synchronization of notes and strike notes across sessions
+  // Sync external demographic updates when field is not focused
+  useEffect(() => {
+    if (!juror) return;
+    const activeDataField = document.activeElement?.getAttribute('data-field');
+    setDemographics(prev => ({
+      fullName: activeDataField === 'fullName' ? prev.fullName : (juror.fullName || ''),
+      age: activeDataField === 'age' ? prev.age : (juror.age !== undefined ? String(juror.age) : ''),
+      gender: activeDataField === 'gender' ? prev.gender : (juror.gender || ''),
+      raceEthnicity: activeDataField === 'raceEthnicity' ? prev.raceEthnicity : (juror.raceEthnicity || ''),
+      areaOfCounty: activeDataField === 'areaOfCounty' ? prev.areaOfCounty : (juror.areaOfCounty || juror.cityState || juror.cityOrZip || ''),
+      occupation: activeDataField === 'occupation' ? prev.occupation : (juror.occupation || ''),
+    }));
+  }, [
+    juror?.fullName,
+    juror?.age,
+    juror?.gender,
+    juror?.raceEthnicity,
+    juror?.areaOfCounty,
+    juror?.cityState,
+    juror?.cityOrZip,
+    juror?.occupation,
+  ]);
+
+  // Auto-resize textareas whenever local text changes (handles typing and shared session expansions)
+  useEffect(() => {
+    if (notesRef.current) {
+      notesRef.current.style.height = 'auto';
+      notesRef.current.style.height = `${Math.max(72, notesRef.current.scrollHeight)}px`;
+    }
+  }, [localNotes]);
+
+  useEffect(() => {
+    if (strikeNoteRef.current) {
+      strikeNoteRef.current.style.height = 'auto';
+      strikeNoteRef.current.style.height = `${Math.max(52, strikeNoteRef.current.scrollHeight)}px`;
+    }
+  }, [localStrikeNote]);
+
+  // Real-time synchronization of notes across sessions even if user has the textarea focused
   useEffect(() => {
     if (!juror) return;
 
-    if (document.activeElement !== notesRef.current) {
-      if (juror.notes !== undefined && juror.notes !== localNotes) {
-        setLocalNotes(juror.notes || '');
-        if (notesRef.current) {
-          requestAnimationFrame(() => {
-            if (notesRef.current) {
-              notesRef.current.style.height = 'auto';
-              notesRef.current.style.height = `${Math.max(72, notesRef.current.scrollHeight)}px`;
-            }
-          });
-        }
+    if (juror.notes !== undefined && juror.notes !== localNotes) {
+      const isFocused = document.activeElement === notesRef.current;
+      const el = notesRef.current;
+      const start = el ? el.selectionStart : null;
+      const end = el ? el.selectionEnd : null;
+      const oldLen = el ? el.value.length : 0;
+
+      setLocalNotes(juror.notes || '');
+
+      if (isFocused && el && start !== null && end !== null) {
+        requestAnimationFrame(() => {
+          if (document.activeElement === el) {
+            const newLen = (juror.notes || '').length;
+            const delta = newLen - oldLen;
+            const newStart = Math.min(newLen, Math.max(0, start + (start >= oldLen ? delta : 0)));
+            const newEnd = Math.min(newLen, Math.max(0, end + (end >= oldLen ? delta : 0)));
+            el.setSelectionRange(newStart, newEnd);
+          }
+        });
       }
     }
 
-    if (document.activeElement !== strikeNoteRef.current) {
-      if (juror.strikeIntentNote !== undefined && juror.strikeIntentNote !== localStrikeNote) {
-        setLocalStrikeNote(juror.strikeIntentNote || '');
-        if (strikeNoteRef.current) {
-          requestAnimationFrame(() => {
-            if (strikeNoteRef.current) {
-              strikeNoteRef.current.style.height = 'auto';
-              strikeNoteRef.current.style.height = `${Math.max(52, strikeNoteRef.current.scrollHeight)}px`;
-            }
-          });
-        }
+    if (juror.strikeIntentNote !== undefined && juror.strikeIntentNote !== localStrikeNote) {
+      const isFocused = document.activeElement === strikeNoteRef.current;
+      const el = strikeNoteRef.current;
+      const start = el ? el.selectionStart : null;
+      const end = el ? el.selectionEnd : null;
+      const oldLen = el ? el.value.length : 0;
+
+      setLocalStrikeNote(juror.strikeIntentNote || '');
+
+      if (isFocused && el && start !== null && end !== null) {
+        requestAnimationFrame(() => {
+          if (document.activeElement === el) {
+            const newLen = (juror.strikeIntentNote || '').length;
+            const delta = newLen - oldLen;
+            const newStart = Math.min(newLen, Math.max(0, start + (start >= oldLen ? delta : 0)));
+            const newEnd = Math.min(newLen, Math.max(0, end + (end >= oldLen ? delta : 0)));
+            el.setSelectionRange(newStart, newEnd);
+          }
+        });
       }
     }
   }, [juror?.notes, juror?.strikeIntentNote]);
@@ -282,13 +372,7 @@ export const JurorDetailDrawer: React.FC = () => {
       // 4. QUESTION LOGGER TOGGLE: 'q' / 'Q'
       if ((e.key === 'q' || e.key === 'Q') && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
-        if (activeQuestionId) {
-          setActiveQuestionId(null);
-        } else if (questions.length > 0) {
-          setActiveQuestionId(questions[0].id);
-        } else {
-          setActiveQuestionId('new');
-        }
+        toggleQuestionLogger();
         return;
       }
     };
@@ -297,10 +381,12 @@ export const JurorDetailDrawer: React.FC = () => {
       if (!selectedJurorId) return;
       if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
         const target = e.target as HTMLElement;
-        // Do not close if clicking a juror card, modal, dialog, navbar, or question logger toolbar
+        // Do not close if clicking a juror card, strike button, modal, dialog, navbar, or question logger toolbar
         if (
           target.closest('[data-panel-card-id]') ||
           target.closest('[data-juror-card]') ||
+          target.closest('[data-strike-action]') ||
+          target.closest('button') ||
           target.closest('.modal-container') ||
           target.closest('[role="dialog"]') ||
           target.closest('.fixed.inset-0') ||
@@ -406,6 +492,18 @@ export const JurorDetailDrawer: React.FC = () => {
     }
   };
 
+  const handleSaveComment = (questionId: string, text: string) => {
+    const current = juror.responses?.[questionId];
+    const newResponses = {
+      ...(juror.responses || {}),
+      [questionId]: {
+        answeredYes: current ? current.answeredYes : false,
+        note: text.trim() || undefined,
+      },
+    };
+    updateJuror(juror.id, { responses: newResponses });
+  };
+
   return (
     <aside
       ref={drawerRef}
@@ -493,6 +591,24 @@ export const JurorDetailDrawer: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Official Status Banner (when struck) */}
+        {isStruck && (
+          <div className="bg-rose-950/40 p-2.5 rounded-xl border border-rose-800/60 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] text-rose-400 uppercase font-bold tracking-wider block">Official Status</span>
+              <span className="text-xs text-rose-200 font-semibold">{juror.statusNotes || 'Struck from Venire'}</span>
+            </div>
+            <button
+              onClick={() => revertStrike(juror.id)}
+              className="flex items-center space-x-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-indigo-300 rounded-lg text-xs font-semibold transition-colors shadow-sm"
+              title="Undo this strike and restore juror to active status"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Revert Strike</span>
+            </button>
+          </div>
+        )}
 
         {/* SECTION: TACTICAL RATING */}
         <div>
@@ -610,22 +726,6 @@ export const JurorDetailDrawer: React.FC = () => {
               className="w-full bg-slate-900 border border-slate-700/80 focus:border-indigo-500 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-600 outline-none resize-none leading-relaxed overflow-hidden"
             />
           </div>
-
-          {/* If juror is struck in court or currently seated in panel, show courtroom status */}
-          {isStruck ? (
-            <div className="flex items-center justify-between bg-slate-900/90 p-2 rounded-lg border border-slate-700/70 mt-2">
-              <span className="text-[11px] text-slate-300 font-medium">
-                Official Status: <span className="text-amber-300 font-semibold">{juror.statusNotes || 'Struck'}</span>
-              </span>
-              <button
-                onClick={() => revertStrike(juror.id)}
-                className="flex items-center space-x-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded text-[11px] font-semibold transition-colors"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Revert Strike</span>
-              </button>
-            </div>
-          ) : null}
         </div>
 
         {/* SECTION: DEMOGRAPHICS & PROFILE */}
@@ -634,12 +734,26 @@ export const JurorDetailDrawer: React.FC = () => {
             Juror Profile & Demographics
           </label>
           <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="col-span-2">
+              <span className="text-slate-500 block text-[10px]">Juror Name</span>
+              <input
+                type="text"
+                data-field="fullName"
+                value={demographics.fullName}
+                onChange={e => handleDemographicChange('fullName', e.target.value)}
+                onBlur={() => flushUpdates()}
+                placeholder="e.g. Jane Doe"
+                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
+              />
+            </div>
             <div>
               <span className="text-slate-500 block text-[10px]">Age</span>
               <input
                 type="text"
-                value={juror.age || ''}
-                onChange={e => updateJuror(juror.id, { age: e.target.value })}
+                data-field="age"
+                value={demographics.age}
+                onChange={e => handleDemographicChange('age', e.target.value)}
+                onBlur={() => flushUpdates()}
                 placeholder="e.g. 42"
                 className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
               />
@@ -648,8 +762,10 @@ export const JurorDetailDrawer: React.FC = () => {
               <span className="text-slate-500 block text-[10px]">Gender</span>
               <input
                 type="text"
-                value={juror.gender || ''}
-                onChange={e => updateJuror(juror.id, { gender: e.target.value })}
+                data-field="gender"
+                value={demographics.gender}
+                onChange={e => handleDemographicChange('gender', e.target.value)}
+                onBlur={() => flushUpdates()}
                 placeholder="e.g. F / M"
                 className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
               />
@@ -658,8 +774,10 @@ export const JurorDetailDrawer: React.FC = () => {
               <span className="text-slate-500 block text-[10px]">Race / Ethnicity</span>
               <input
                 type="text"
-                value={juror.raceEthnicity || ''}
-                onChange={e => updateJuror(juror.id, { raceEthnicity: e.target.value })}
+                data-field="raceEthnicity"
+                value={demographics.raceEthnicity}
+                onChange={e => handleDemographicChange('raceEthnicity', e.target.value)}
+                onBlur={() => flushUpdates()}
                 placeholder="e.g. Caucasian / Hispanic"
                 className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
               />
@@ -668,8 +786,10 @@ export const JurorDetailDrawer: React.FC = () => {
               <span className="text-slate-500 block text-[10px]">Area of County</span>
               <input
                 type="text"
-                value={juror.areaOfCounty || juror.cityState || juror.cityOrZip || ''}
-                onChange={e => updateJuror(juror.id, { areaOfCounty: e.target.value, cityState: e.target.value })}
+                data-field="areaOfCounty"
+                value={demographics.areaOfCounty}
+                onChange={e => handleDemographicChange('areaOfCounty', e.target.value)}
+                onBlur={() => flushUpdates()}
                 placeholder="e.g. North County, East Austin"
                 className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
               />
@@ -678,19 +798,11 @@ export const JurorDetailDrawer: React.FC = () => {
               <span className="text-slate-500 block text-[10px]">Occupation</span>
               <input
                 type="text"
-                value={juror.occupation || ''}
-                onChange={e => updateJuror(juror.id, { occupation: e.target.value })}
+                data-field="occupation"
+                value={demographics.occupation}
+                onChange={e => handleDemographicChange('occupation', e.target.value)}
+                onBlur={() => flushUpdates()}
                 placeholder="e.g. Mechanical Engineer"
-                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
-              />
-            </div>
-            <div className="col-span-2">
-              <span className="text-slate-500 block text-[10px]">Employer</span>
-              <input
-                type="text"
-                value={juror.employer || ''}
-                onChange={e => updateJuror(juror.id, { employer: e.target.value })}
-                placeholder="e.g. Dell Technologies"
                 className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
               />
             </div>
@@ -708,42 +820,128 @@ export const JurorDetailDrawer: React.FC = () => {
                 const resp = juror.responses?.[q.id];
                 const raised = resp?.answeredYes;
                 const note = resp?.note;
+                const isEditingThisComment = editingCommentQId === q.id;
+
                 return (
                   <div
                     key={q.id}
-                    onClick={() => toggleJurorResponse(juror.id, q.id)}
-                    className={`p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+                    className={`p-2.5 rounded-lg border text-xs flex flex-col transition-colors ${
                       raised
                         ? 'bg-amber-950/40 border-amber-500/50 text-amber-200'
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
                     }`}
                   >
-                    <div className="flex items-center space-x-2 leading-snug break-words flex-1 min-w-0">
-                      <span className="flex-1">{q.text}</span>
-                      {raised && note && (
-                        <div
-                          className="relative group/note flex-shrink-0"
-                          title={note}
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <div className="p-1 rounded bg-amber-500/20 border border-amber-400/40 text-amber-300 hover:text-white hover:bg-amber-500/40 transition-colors flex items-center space-x-1">
-                            <MessageSquare className="w-3.5 h-3.5" />
-                          </div>
-                          {/* Floating Note Tooltip on Hover */}
-                          <div className="absolute bottom-full right-0 mb-1.5 hidden group-hover/note:flex flex-col items-end z-50 pointer-events-none">
-                            <div className="bg-slate-900 text-slate-100 border border-amber-500/50 text-[11px] font-medium py-1.5 px-2.5 rounded-lg shadow-2xl max-w-xs whitespace-normal break-words text-left">
-                              {note}
+                    <div
+                      onClick={() => toggleJurorResponse(juror.id, q.id)}
+                      className="flex items-center justify-between gap-2 cursor-pointer w-full select-none"
+                    >
+                      <div className="flex items-center space-x-2 leading-snug break-words flex-1 min-w-0">
+                        <span className="flex-1">{q.text}</span>
+                        {note && (
+                          <div
+                            className="relative group/note flex-shrink-0"
+                            onClick={e => {
+                              e.stopPropagation();
+                              if (isEditingThisComment) {
+                                setEditingCommentQId(null);
+                              } else {
+                                setEditingCommentQId(q.id);
+                                setCommentDraft(note || '');
+                              }
+                            }}
+                          >
+                            <div className="p-1 rounded bg-amber-500/20 border border-amber-400/40 text-amber-300 hover:text-white hover:bg-amber-500/40 transition-colors flex items-center space-x-1">
+                              <MessageSquare className="w-3.5 h-3.5" />
                             </div>
-                            <div className="w-2 h-2 bg-slate-900 border-r border-b border-amber-500/50 transform rotate-45 -mt-1 mr-2" />
+                            {/* Floating Note Tooltip on Hover (wide, no default browser tooltip) */}
+                            <div className="absolute bottom-full right-0 mb-1.5 hidden group-hover/note:flex flex-col items-end z-50 pointer-events-none">
+                              <div className="bg-slate-900 text-slate-100 border border-amber-500/60 text-xs font-normal py-2 px-3 rounded-xl shadow-2xl w-[310px] max-w-[calc(100vw-3rem)] whitespace-normal break-words text-left leading-relaxed">
+                                <div className="text-[10px] uppercase font-bold text-amber-400 mb-0.5 tracking-wider">Comment:</div>
+                                {note}
+                              </div>
+                              <div className="w-2 h-2 bg-slate-900 border-r border-b border-amber-500/60 transform rotate-45 -mt-1 mr-3" />
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
+
+                      <div className="flex items-center space-x-1 flex-shrink-0">
+                        {!note && (
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation();
+                              if (isEditingThisComment) {
+                                setEditingCommentQId(null);
+                              } else {
+                                setEditingCommentQId(q.id);
+                                setCommentDraft('');
+                              }
+                            }}
+                            className="p-1 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-300 transition-colors"
+                            title="Add comment"
+                          >
+                            <MessageSquarePlus className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          raised ? 'bg-amber-500 text-slate-950 font-black shadow-sm' : 'bg-slate-800 text-slate-500'
+                        }`}>
+                          {raised ? 'YES' : 'NO'}
+                        </span>
+                      </div>
                     </div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ${
-                      raised ? 'bg-amber-500 text-slate-950 font-black shadow-sm' : 'bg-slate-800 text-slate-500'
-                    }`}>
-                      {raised ? 'YES' : 'NO'}
-                    </span>
+
+                    {/* Inline comment editor */}
+                    {isEditingThisComment && (
+                      <div
+                        className="mt-2.5 pt-2 border-t border-slate-800 flex flex-col space-y-1.5 w-full"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                          <span className="font-semibold text-amber-300">Response Comment</span>
+                          {note && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleSaveComment(q.id, '');
+                                setEditingCommentQId(null);
+                              }}
+                              className="text-rose-400 hover:text-rose-300 underline"
+                            >
+                              Delete Comment
+                            </button>
+                          )}
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={commentDraft}
+                          onChange={e => setCommentDraft(e.target.value)}
+                          placeholder="Type comment regarding hand-raise answer..."
+                          autoFocus
+                          className="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-lg p-2 text-xs text-slate-100 placeholder-slate-500 outline-none resize-none leading-relaxed"
+                        />
+                        <div className="flex justify-end space-x-2 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditingCommentQId(null)}
+                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded text-[11px]"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleSaveComment(q.id, commentDraft);
+                              setEditingCommentQId(null);
+                            }}
+                            className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded text-[11px]"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

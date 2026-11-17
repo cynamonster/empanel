@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useCase } from '../../context/CaseContext';
 import { parseDelimitedText, mapRowsToJurors } from '../../utils/csvParser';
 import { Upload, ClipboardList, Plus, FileText, Check, AlertCircle, Trash2 } from 'lucide-react';
@@ -13,8 +13,44 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
   const { activeCase, addJurors } = useCase();
   const [activeTab, setActiveTab] = useState<'upload' | 'paste' | 'manual'>('upload');
   const [rawText, setRawText] = useState('');
-  const [parsedPreview, setParsedPreview] = useState<Juror[]>([]);
+  const [parsedPreview, setParsedPreview] = useState<Juror[]>(() => {
+    try {
+      if (activeCase) {
+        const saved = localStorage.getItem(`empanel_intake_preview_${activeCase.id}`);
+        if (saved) return JSON.parse(saved);
+      }
+    } catch (e) {}
+    return [];
+  });
   const [fileName, setFileName] = useState('');
+
+  const updateParsedPreview = (jurors: Juror[]) => {
+    setParsedPreview(jurors);
+    if (activeCase) {
+      if (jurors.length > 0) {
+        try {
+          localStorage.setItem(`empanel_intake_preview_${activeCase.id}`, JSON.stringify(jurors));
+        } catch (e) {}
+      } else {
+        try {
+          localStorage.removeItem(`empanel_intake_preview_${activeCase.id}`);
+        } catch (e) {}
+      }
+    }
+  };
+
+  // Sync preview when switching active cases
+  useEffect(() => {
+    if (!activeCase) return;
+    try {
+      const saved = localStorage.getItem(`empanel_intake_preview_${activeCase.id}`);
+      if (saved) {
+        setParsedPreview(JSON.parse(saved));
+      } else {
+        setParsedPreview([]);
+      }
+    } catch (e) {}
+  }, [activeCase?.id]);
   
   // Manual single add form state
   const [manualNumber, setManualNumber] = useState('');
@@ -39,7 +75,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
       if (text) {
         const matrix = parseDelimitedText(text);
         const mapped = mapRowsToJurors(matrix, activeCase.id);
-        setParsedPreview(mapped);
+        updateParsedPreview(mapped);
       }
     };
     reader.readAsText(file);
@@ -49,7 +85,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
     if (!rawText.trim()) return;
     const matrix = parseDelimitedText(rawText);
     const mapped = mapRowsToJurors(matrix, activeCase.id);
-    setParsedPreview(mapped);
+    updateParsedPreview(mapped);
   };
 
   const handleManualAdd = (e: React.FormEvent) => {
@@ -75,7 +111,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
       updatedAt: Date.now(),
     };
 
-    setParsedPreview(prev => [newJuror, ...prev]);
+    updateParsedPreview([newJuror, ...parsedPreview]);
     // Reset inputs
     const nextNum = parseInt(manualNumber, 10);
     setManualNumber(!isNaN(nextNum) ? String(nextNum + 1) : '');
@@ -94,7 +130,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
   const handleConfirmImport = async () => {
     if (parsedPreview.length === 0) return;
     await addJurors(parsedPreview);
-    setParsedPreview([]);
+    updateParsedPreview([]);
     setRawText('');
     setFileName('');
     onClose();
@@ -185,7 +221,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
               </p>
               <textarea
                 rows={5}
-                placeholder={"1\tJane Doe\tAccountant\t45\tNorth County\n2\tJohn Smith\tElectrician\t38\tSouth County"}
+                placeholder={"Juror #, Full Name, Occupation, Age, Gender, Area of County\n1, Jane Doe, Accountant, 45, Female, North County\n2, John Smith, Electrician, 38, Male, South County"}
                 value={rawText}
                 onChange={e => setRawText(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 font-mono outline-none focus:border-indigo-500 resize-none"
@@ -288,7 +324,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
                   Ready to Import: <span className="text-emerald-400 font-mono">{parsedPreview.length} Jurors</span>
                 </div>
                 <button
-                  onClick={() => setParsedPreview([])}
+                  onClick={() => updateParsedPreview([])}
                   className="text-xs text-rose-400 hover:text-rose-300 flex items-center space-x-1"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
