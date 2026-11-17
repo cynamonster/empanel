@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Juror } from '../../types';
+import { calculateAgeFromBirthYear } from '../../utils/csvParser';
 import { useCase } from '../../context/CaseContext';
 import { Hand, User, ShieldAlert, Award, AlertCircle, MessageSquareText } from 'lucide-react';
 
@@ -7,6 +8,7 @@ interface JurorCardProps {
   juror: Juror;
   compact?: boolean;
   isDraggable?: boolean;
+  isSeated?: boolean;
   seatLabel?: string;
   isDimmed?: boolean;
   highlightEffect?: boolean;
@@ -45,6 +47,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
   juror,
   compact = false,
   isDraggable = true,
+  isSeated: propIsSeated,
   seatLabel,
   isDimmed = false,
   highlightEffect = false,
@@ -52,6 +55,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
   onDragOver,
   onDrop,
 }) => {
+  const isSeated = propIsSeated !== undefined ? propIsSeated : (juror.seatNumber !== undefined);
   const {
     selectedJurorId,
     setSelectedJurorId,
@@ -294,6 +298,23 @@ export const JurorCard: React.FC<JurorCardProps> = ({
     }
   };
 
+  // Favorability styling for unseated jury pool cards matching Podium View outlines
+  let poolFavorabilityStyle = 'bg-slate-900 border-slate-800 hover:border-slate-650 hover:bg-slate-850 shadow-sm';
+  if (!isSeated) {
+    const rating = juror.rating || 0;
+    if (rating > 0) {
+      poolFavorabilityStyle = rating >= 2
+        ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-950/20 hover:bg-emerald-950/30'
+        : 'border-emerald-500/60 bg-emerald-950/20 hover:bg-emerald-950/30';
+    } else if (rating < 0) {
+      poolFavorabilityStyle = rating <= -2
+        ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-950/20 hover:bg-rose-950/30'
+        : 'border-rose-500/60 bg-rose-950/20 hover:bg-rose-950/30';
+    }
+  }
+
+  const calculatedAge = juror.age || calculateAgeFromBirthYear(juror.birthYear);
+
   return (
     <div
       ref={cardRef}
@@ -308,9 +329,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
       className={`relative group rounded-xl p-2.5 select-none transition-all duration-300 ease-out transform ${
         isDraggable ? 'cursor-grab active:cursor-grabbing hover:scale-[1.01]' : 'cursor-pointer'
       } ${
-        highlightEffect
-          ? 'ring-2 ring-emerald-400 bg-emerald-950/40 shadow-lg shadow-emerald-500/30 scale-[1.03] animate-pulse'
-          : isDimmed
+        isDimmed
           ? 'opacity-20 grayscale brightness-50 hover:opacity-85 hover:grayscale-0 hover:brightness-100 bg-slate-950/60 border-slate-850'
           : activeQuestionId
           ? isHandRaised
@@ -320,7 +339,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
           ? 'bg-indigo-950/80 border-indigo-400 ring-2 ring-indigo-400/50 shadow-lg shadow-indigo-950/50'
           : isStruck
           ? 'bg-slate-900/40 border-slate-800/80 opacity-60 hover:opacity-100 hover:bg-slate-900/70'
-          : 'bg-slate-900 border-slate-800 hover:border-slate-650 hover:bg-slate-850 shadow-sm'
+          : poolFavorabilityStyle
       }`}
     >
       {/* Header: Seat / Juror # + Status / Rating */}
@@ -338,7 +357,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
 
         <div className="flex items-center space-x-1.5">
           {getStatusBadge()}
-          {getRatingBadge(juror.rating)}
+          {isSeated && getRatingBadge(juror.rating)}
         </div>
       </div>
 
@@ -355,7 +374,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
           </div>
           <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5 gap-1">
             <span className="truncate">
-              {[juror.age ? `${juror.age}y` : null, juror.raceEthnicity]
+              {[calculatedAge ? `${calculatedAge}y` : null, juror.raceEthnicity]
                 .filter(Boolean)
                 .join(' • ')}
             </span>

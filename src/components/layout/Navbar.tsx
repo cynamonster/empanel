@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useCase } from '../../context/CaseContext';
 import {
   Scale,
@@ -55,9 +55,24 @@ export const Navbar: React.FC<NavbarProps> = ({
     connectedPeers,
     changeSyncRole,
     syncLatency,
+    lastSyncActivity,
   } = useCase();
 
   const [showCaseMenu, setShowCaseMenu] = useState(false);
+  const [isSyncPulsing, setIsSyncPulsing] = useState(false);
+  const pulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!lastSyncActivity) return;
+    setIsSyncPulsing(true);
+    if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
+    pulseTimerRef.current = setTimeout(() => {
+      setIsSyncPulsing(false);
+    }, 1300);
+    return () => {
+      if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
+    };
+  }, [lastSyncActivity]);
 
   // Peremptory strikes stats (supports soft cap and court-granted supplemental strikes)
   const plaintiffStrikesUsed = peremptoryStrikes.filter(s => s.side === 'plaintiff_prosecution').length;
@@ -256,7 +271,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center space-x-1.5 flex-shrink-0">
             <button
               onClick={() => onOpenPairModal()}
-              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
+              className={`relative overflow-hidden flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
                 syncRole === 'second_chair'
                   ? 'border-indigo-500/50 bg-indigo-500/20 text-indigo-300'
                   : 'border-emerald-500/50 bg-emerald-500/20 text-emerald-300'
@@ -267,12 +282,30 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : `Host Active (${connectedPeers.length > 1 ? `${connectedPeers.length - 1} peers connected` : 'Waiting for peers'})`
               }
             >
+              {/* Gentle circling border glow on edits */}
+              {isSyncPulsing && (
+                <div
+                  className="pointer-events-none absolute -inset-[150%] animate-border-sweep"
+                  style={{
+                    background: `conic-gradient(from 0deg, transparent 0deg, transparent 270deg, ${
+                      syncRole === 'second_chair' ? 'rgba(129, 140, 248, 0.95)' : 'rgba(52, 211, 153, 0.95)'
+                    } 360deg)`,
+                  }}
+                />
+              )}
+              {/* Inner backing so content is sharp above the rotating beam while the beam sweeps the border */}
+              <div
+                className={`absolute inset-[1px] rounded-[7px] pointer-events-none ${
+                  syncRole === 'second_chair' ? 'bg-slate-900/90' : 'bg-slate-900/90'
+                }`}
+              />
+
               <Radio
-                className={`w-3.5 h-3.5 ${
+                className={`relative z-10 w-3.5 h-3.5 ${
                   syncRole === 'second_chair' ? 'text-indigo-400' : 'text-emerald-400'
                 } animate-pulse`}
               />
-              <span className="font-mono text-xs font-semibold">
+              <span className="relative z-10 font-mono text-xs font-semibold">
                 {syncRole === 'second_chair'
                   ? '2nd Chair'
                   : connectedPeers.length > 1

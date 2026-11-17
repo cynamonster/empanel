@@ -378,7 +378,6 @@ export const SeatingBoxView: React.FC = () => {
               juror={juror}
               seatLabel={label}
               isDimmed={isDimmed}
-              highlightEffect={isSlidingOrSwapped}
               isDraggable={true}
               onDragStart={(e) => handleDragStart(e, juror.id)}
             />
@@ -875,7 +874,6 @@ export const SeatingBoxView: React.FC = () => {
                                     <JurorCard
                                       juror={juror}
                                       isDimmed={isDimmed}
-                                      highlightEffect={isSwapped}
                                       isDraggable={true}
                                       onDragStart={(e) => handleDragStart(e, juror.id)}
                                     />

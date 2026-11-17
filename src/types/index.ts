@@ -13,6 +13,7 @@ export interface Juror {
   caseId: string;
   jurorNumber: string;
   fullName: string;
+  birthYear?: number | string;
   age?: number | string;
   gender?: string;
   raceEthnicity?: string;

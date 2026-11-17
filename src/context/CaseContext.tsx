@@ -96,6 +96,8 @@ interface CaseContextValue {
   restoreFromBackup: (backupData: any) => Promise<void>;
   loadDemoCase: () => Promise<void>;
   refreshData: () => Promise<void>;
+
+  lastSyncActivity: number;
 }
 
 const CaseContext = createContext<CaseContextValue | null>(null);
@@ -161,6 +163,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const priorCaseIdRef = useRef<string | null>(null);
   const [whispers, setWhispers] = useState<WhisperMessage[]>([]);
   const [activeWhisper, setActiveWhisper] = useState<WhisperMessage | null>(null);
+  const [lastSyncActivity, setLastSyncActivity] = useState<number>(0);
 
   const activeCaseRef = useRef(activeCase);
   activeCaseRef.current = activeCase;
@@ -293,6 +296,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setActiveWhisper(whisper);
       },
       onMutationReceived: async (mutation) => {
+        setLastSyncActivity(Date.now());
         switch (mutation.type) {
           case 'SNAPSHOT':
             if (mutation.payload.activeCase) {
@@ -348,6 +352,27 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
               return updated;
             });
             break;
+
+          case 'DELETE_JUROR': {
+            const { jurorId } = mutation;
+            db.jurors.delete(jurorId).catch(() => {});
+            setJurors(prev => prev.filter(j => j.id !== jurorId));
+            if (selectedJurorId === jurorId) {
+              setSelectedJurorId(null);
+            }
+            setActiveCase(prev => {
+              if (!prev || !prev.galleryOrder?.includes(jurorId)) return prev;
+              const updatedOrder = prev.galleryOrder.map(id => id === jurorId ? null : id);
+              const updated = { ...prev, galleryOrder: updatedOrder, updatedAt: Date.now() };
+              db.cases.put(updated).catch(() => {});
+              return updated;
+            });
+            db.peremptoryStrikes.where('jurorId').equals(jurorId).delete().catch(() => {});
+            db.causeChallenges.where('jurorId').equals(jurorId).delete().catch(() => {});
+            setPeremptoryStrikes(prev => prev.filter(s => s.jurorId !== jurorId));
+            setCauseChallenges(prev => prev.filter(c => c.jurorId !== jurorId));
+            break;
+          }
 
           case 'UPDATE_CASE':
             setActiveCase(prev => {
@@ -565,14 +590,28 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await db.jurors.put(updated);
     setJurors(prev => prev.map(j => j.id === jurorId ? updated : j));
     syncSession.sendMutation({ type: 'UPDATE_JUROR', jurorId, updates });
+    setLastSyncActivity(Date.now());
   };
 
   const deleteJuror = async (jurorId: string) => {
-    await db.jurors.delete(jurorId);
+    pushSnapshot();
+    await db.jurors.delete(jurorId).catch(() => {});
     setJurors(prev => prev.filter(j => j.id !== jurorId));
     if (selectedJurorId === jurorId) {
       setSelectedJurorId(null);
     }
+    // Clean up galleryOrder if juror was in it
+    if (activeCase?.galleryOrder && activeCase.galleryOrder.includes(jurorId)) {
+      const updatedGallery = activeCase.galleryOrder.map(id => id === jurorId ? null : id);
+      await updateActiveCase({ galleryOrder: updatedGallery });
+    }
+    await db.peremptoryStrikes.where('jurorId').equals(jurorId).delete().catch(() => {});
+    await db.causeChallenges.where('jurorId').equals(jurorId).delete().catch(() => {});
+    setPeremptoryStrikes(prev => prev.filter(s => s.jurorId !== jurorId));
+    setCauseChallenges(prev => prev.filter(c => c.jurorId !== jurorId));
+
+    syncSession.sendMutation({ type: 'DELETE_JUROR', jurorId });
+    setLastSyncActivity(Date.now());
   };
 
   const assignSeat = async (jurorId: string, seatNumber: number, isAlternate = false) => {
@@ -1411,6 +1450,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     reorderGalleryJurors,
     moveJurorToGallerySpot,
     updateAisleSplits,
+    lastSyncActivity,
   }), [
     cases,
     activeCase,

@@ -420,7 +420,6 @@ export const SeatingGridView: React.FC = () => {
                                     juror={juror}
                                     isDimmed={isDimmed}
                                     isDraggable={true}
-                                    highlightEffect={isSwapped}
                                     onDragStart={(e) => handleJurorDragStart(e, juror.id)}
                                   />
                                 </div>

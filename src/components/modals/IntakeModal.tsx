@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useCase } from '../../context/CaseContext';
-import { parseDelimitedText, mapRowsToJurors } from '../../utils/csvParser';
+import { parseDelimitedText, mapRowsToJurors, calculateAgeFromBirthYear, parseJurorAgeAndBirthYear } from '../../utils/csvParser';
 import { Upload, ClipboardList, Plus, FileText, Check, AlertCircle, Trash2 } from 'lucide-react';
 import type { Juror } from '../../types';
 
@@ -56,7 +56,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
   const [manualNumber, setManualNumber] = useState('');
   const [manualName, setManualName] = useState('');
   const [manualOcc, setManualOcc] = useState('');
-  const [manualAge, setManualAge] = useState('');
+  const [manualBirthYear, setManualBirthYear] = useState('');
   const [manualGender, setManualGender] = useState('');
   const [manualCity, setManualCity] = useState('');
 
@@ -92,13 +92,15 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
     e.preventDefault();
     if (!manualNumber.trim()) return;
 
+    const parsedAgeInfo = parseJurorAgeAndBirthYear(manualBirthYear);
     const newJuror: Juror = {
       id: `juror-${activeCase.id}-${manualNumber}-${Date.now()}`,
       caseId: activeCase.id,
       jurorNumber: manualNumber.trim(),
       fullName: manualName.trim() || `Juror #${manualNumber.trim()}`,
       occupation: manualOcc.trim() || undefined,
-      age: manualAge.trim() || undefined,
+      birthYear: parsedAgeInfo.birthYear || manualBirthYear.trim() || undefined,
+      age: parsedAgeInfo.age || undefined,
       gender: manualGender.trim() || undefined,
       areaOfCounty: manualCity.trim() || undefined,
       cityState: manualCity.trim() || undefined,
@@ -117,7 +119,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
     setManualNumber(!isNaN(nextNum) ? String(nextNum + 1) : '');
     setManualName('');
     setManualOcc('');
-    setManualAge('');
+    setManualBirthYear('');
     setManualGender('');
     setManualCity('');
 
@@ -221,7 +223,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
               </p>
               <textarea
                 rows={5}
-                placeholder={"Juror #, Full Name, Occupation, Age, Gender, Area of County\n1, Jane Doe, Accountant, 45, Female, North County\n2, John Smith, Electrician, 38, Male, South County"}
+                placeholder={"Juror #, Full Name, Occupation, Birth Year, Gender, Area of County\n1, Jane Doe, Accountant, 1980, Female, North County\n2, John Smith, Electrician, 1987, Male, South County"}
                 value={rawText}
                 onChange={e => setRawText(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 font-mono outline-none focus:border-indigo-500 resize-none"
@@ -275,12 +277,19 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-400 block mb-1">Age</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] text-slate-400">Birth Year</label>
+                    {manualBirthYear && calculateAgeFromBirthYear(manualBirthYear) !== undefined && (
+                      <span className="text-[10px] text-emerald-400 font-mono font-bold">
+                        {calculateAgeFromBirthYear(manualBirthYear)}y
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
-                    placeholder="e.g. 34"
-                    value={manualAge}
-                    onChange={e => setManualAge(e.target.value)}
+                    placeholder="e.g. 1985"
+                    value={manualBirthYear}
+                    onChange={e => setManualBirthYear(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none"
                   />
                 </div>
@@ -349,7 +358,7 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
                         <td className="p-2 font-mono font-bold text-indigo-400">{p.jurorNumber}</td>
                         <td className="p-2 font-medium text-slate-200">{p.fullName}</td>
                         <td className="p-2 text-slate-400">{p.occupation || '—'}</td>
-                        <td className="p-2 text-slate-400">{p.age || ''} {p.gender || ''}</td>
+                        <td className="p-2 text-slate-400">{p.age ? `${p.age}y` : (p.birthYear || '')} {p.gender || ''}</td>
                         <td className="p-2 text-slate-400">{p.areaOfCounty || p.cityState || p.cityOrZip || '—'}</td>
                       </tr>
                     ))}

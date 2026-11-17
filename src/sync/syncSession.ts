@@ -28,6 +28,7 @@ export type SyncMutation =
   | { type: 'REQUEST_SNAPSHOT' }
   | { type: 'BATCH_JUROR_UPDATE'; jurors: any[] }
   | { type: 'UPDATE_JUROR'; jurorId: string; updates: any }
+  | { type: 'DELETE_JUROR'; jurorId: string }
   | { type: 'UPDATE_CASE'; updates: any }
   | { type: 'TOGGLE_RESPONSE'; jurorId: string; questionId: string }
   | { type: 'ASSIGN_SEAT'; jurorId: string; seatNumber: number; isAlternate?: boolean }

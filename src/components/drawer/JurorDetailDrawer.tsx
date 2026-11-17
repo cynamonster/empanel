@@ -20,6 +20,7 @@ import {
   MessageSquarePlus
 } from 'lucide-react';
 import type { Juror } from '../../types';
+import { calculateAgeFromBirthYear, parseJurorAgeAndBirthYear } from '../../utils/csvParser';
 
 function getOrderedJurors(jurors: Juror[], activeCase: any): Juror[] {
   if (!activeCase || jurors.length === 0) return [];
@@ -87,7 +88,7 @@ export const JurorDetailDrawer: React.FC = () => {
   // Local state for demographics to prevent cursor jump on keystroke
   const [demographics, setDemographics] = useState({
     fullName: juror?.fullName || '',
-    age: juror?.age !== undefined ? String(juror.age) : '',
+    birthYear: juror?.birthYear !== undefined ? String(juror.birthYear) : (juror?.age !== undefined ? String(new Date().getFullYear() - Number(juror.age)) : ''),
     gender: juror?.gender || '',
     raceEthnicity: juror?.raceEthnicity || '',
     areaOfCounty: juror?.areaOfCounty || juror?.cityState || juror?.cityOrZip || '',
@@ -128,6 +129,10 @@ export const JurorDetailDrawer: React.FC = () => {
     if (field === 'areaOfCounty') {
       updates.areaOfCounty = value;
       updates.cityState = value;
+    } else if (field === 'birthYear') {
+      const parsed = parseJurorAgeAndBirthYear(value);
+      updates.birthYear = parsed.birthYear || value;
+      updates.age = parsed.age;
     } else {
       updates[field] = value;
     }
@@ -144,7 +149,7 @@ export const JurorDetailDrawer: React.FC = () => {
       setLocalStrikeNote(juror.strikeIntentNote || '');
       setDemographics({
         fullName: juror.fullName || '',
-        age: juror.age !== undefined ? String(juror.age) : '',
+        birthYear: juror.birthYear !== undefined ? String(juror.birthYear) : (juror.age !== undefined ? String(new Date().getFullYear() - Number(juror.age)) : ''),
         gender: juror.gender || '',
         raceEthnicity: juror.raceEthnicity || '',
         areaOfCounty: juror.areaOfCounty || juror.cityState || juror.cityOrZip || '',
@@ -182,7 +187,7 @@ export const JurorDetailDrawer: React.FC = () => {
     const activeDataField = document.activeElement?.getAttribute('data-field');
     setDemographics(prev => ({
       fullName: activeDataField === 'fullName' ? prev.fullName : (juror.fullName || ''),
-      age: activeDataField === 'age' ? prev.age : (juror.age !== undefined ? String(juror.age) : ''),
+      birthYear: activeDataField === 'birthYear' ? prev.birthYear : (juror.birthYear !== undefined ? String(juror.birthYear) : (juror.age !== undefined ? String(new Date().getFullYear() - Number(juror.age)) : '')),
       gender: activeDataField === 'gender' ? prev.gender : (juror.gender || ''),
       raceEthnicity: activeDataField === 'raceEthnicity' ? prev.raceEthnicity : (juror.raceEthnicity || ''),
       areaOfCounty: activeDataField === 'areaOfCounty' ? prev.areaOfCounty : (juror.areaOfCounty || juror.cityState || juror.cityOrZip || ''),
@@ -190,6 +195,7 @@ export const JurorDetailDrawer: React.FC = () => {
     }));
   }, [
     juror?.fullName,
+    juror?.birthYear,
     juror?.age,
     juror?.gender,
     juror?.raceEthnicity,
@@ -711,9 +717,6 @@ export const JurorDetailDrawer: React.FC = () => {
               <span className="text-[10px] text-slate-400 uppercase font-semibold">
                 Reason / Strike Notes:
               </span>
-              <span className="text-[10px] text-indigo-400/80 font-mono">
-                Shared
-              </span>
             </div>
             <textarea
               ref={strikeNoteRef}
@@ -747,15 +750,25 @@ export const JurorDetailDrawer: React.FC = () => {
               />
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px]">Age</span>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 block text-[10px]">Birth Year</span>
+                {(() => {
+                  const calc = calculateAgeFromBirthYear(demographics.birthYear) || (juror.age ? Number(juror.age) : undefined);
+                  return calc ? (
+                    <span className="text-[10px] text-emerald-400 font-mono font-bold">
+                      {calc}y
+                    </span>
+                  ) : null;
+                })()}
+              </div>
               <input
                 type="text"
-                data-field="age"
-                value={demographics.age}
-                onChange={e => handleDemographicChange('age', e.target.value)}
+                data-field="birthYear"
+                value={demographics.birthYear}
+                onChange={e => handleDemographicChange('birthYear', e.target.value)}
                 onBlur={() => flushUpdates()}
-                placeholder="e.g. 42"
-                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none"
+                placeholder="e.g. 1975"
+                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:border-indigo-500 outline-none font-mono"
               />
             </div>
             <div>
@@ -955,9 +968,6 @@ export const JurorDetailDrawer: React.FC = () => {
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
               General Notes
             </label>
-            <span className="text-[10px] text-indigo-400/80 font-mono">
-              Shared
-            </span>
           </div>
           <textarea
             ref={notesRef}
@@ -976,7 +986,14 @@ export const JurorDetailDrawer: React.FC = () => {
           <button
             onClick={() => {
               if (confirm(`Delete Juror #${juror.jurorNumber} (${juror.fullName})?`)) {
+                if (saveTimerRef.current) {
+                  clearTimeout(saveTimerRef.current);
+                  saveTimerRef.current = null;
+                }
+                pendingUpdatesRef.current = {};
+                activeJurorIdRef.current = undefined;
                 deleteJuror(juror.id);
+                setSelectedJurorId(null);
               }
             }}
             className="w-full py-2 bg-slate-950 hover:bg-rose-950/60 border border-slate-800 hover:border-rose-800 text-rose-400 rounded-lg text-xs font-medium flex items-center justify-center space-x-1.5 transition-colors"

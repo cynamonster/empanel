@@ -3,6 +3,7 @@ import type { Juror } from '../types';
 export interface ParsedJurorData {
   jurorNumber: string;
   fullName: string;
+  birthYear?: string;
   age?: string;
   gender?: string;
   raceEthnicity?: string;
@@ -12,6 +13,62 @@ export interface ParsedJurorData {
   maritalStatus?: string;
   education?: string;
   notes?: string;
+}
+
+export function calculateAgeFromBirthYear(birthYear: number | string | undefined): number | undefined {
+  if (!birthYear) return undefined;
+  const cleaned = String(birthYear).replace(/[^0-9]/g, '').trim();
+  const num = parseInt(cleaned, 10);
+  if (isNaN(num)) return undefined;
+  const currentYear = new Date().getFullYear();
+  let fullYear = num;
+  if (num < 100) {
+    const currentTwoDigit = currentYear % 100;
+    fullYear = num <= currentTwoDigit ? 2000 + num : 1900 + num;
+  }
+  const age = currentYear - fullYear;
+  return age >= 0 && age <= 125 ? age : undefined;
+}
+
+export function parseJurorAgeAndBirthYear(raw: string | number | undefined): { age?: string; birthYear?: string } {
+  if (raw === undefined || raw === null) return {};
+  const str = String(raw).trim();
+  if (!str) return {};
+
+  const num = parseInt(str.replace(/[^0-9]/g, ''), 10);
+  if (isNaN(num)) return { age: str };
+
+  const currentYear = new Date().getFullYear();
+
+  // 4-digit birth year (e.g. 1975)
+  if (num >= 1900 && num <= currentYear) {
+    const calcAge = currentYear - num;
+    return {
+      birthYear: String(num),
+      age: calcAge >= 0 && calcAge <= 125 ? String(calcAge) : undefined,
+    };
+  }
+
+  // Direct age (e.g. 18 to 110)
+  if (num > 0 && num <= 110) {
+    return {
+      age: String(num),
+      birthYear: String(currentYear - num),
+    };
+  }
+
+  // 2-digit year (e.g. 85 -> 1985)
+  const calcAge = calculateAgeFromBirthYear(num);
+  if (calcAge !== undefined) {
+    const twoDigitCurrent = currentYear % 100;
+    const fullYear = num <= twoDigitCurrent ? 2000 + num : 1900 + num;
+    return {
+      birthYear: String(fullYear),
+      age: String(calcAge),
+    };
+  }
+
+  return { age: str };
 }
 
 /**
@@ -81,14 +138,15 @@ export function mapRowsToJurors(matrix: string[][], caseId: string): Juror[] {
     headers = firstRow;
     dataRows = matrix.slice(1);
   } else {
-    // Synthetic headers based on common 1-indexed format: Juror #, Full Name, Occupation, Age, Gender, Area of County
-    headers = ['Juror #', 'Full Name', 'Occupation', 'Age', 'Gender', 'Area of County'];
+    // Synthetic headers based on common 1-indexed format: Juror #, Full Name, Occupation, Birth Year, Gender, Area of County
+    headers = ['Juror #', 'Full Name', 'Occupation', 'Birth Year', 'Gender', 'Area of County'];
     dataRows = matrix;
   }
 
   const numIdx = findIndex(headers, [/jurorno/, /jurornum/, /badge/, /juror/, /no/, /number/, /id/]);
   const nameIdx = findIndex(headers, [/fullname/, /name/, /jurorname/, /prospectivejuror/]);
-  const ageIdx = findIndex(headers, [/age/, /dob/, /birth/]);
+  const birthYearIdx = findIndex(headers, [/birthyear/, /birth/, /dobyear/, /yob/, /yearofbirth/]);
+  const ageIdx = findIndex(headers, [/age/, /dob/]);
   const genderIdx = findIndex(headers, [/gender/, /sex/]);
   const raceIdx = findIndex(headers, [/race/, /ethnicity/]);
   const occIdx = findIndex(headers, [/occupation/, /job/, /title/, /profession/]);
@@ -112,7 +170,8 @@ export function mapRowsToJurors(matrix: string[][], caseId: string): Juror[] {
       fullName = `Juror #${jurorNumber}`;
     }
 
-    const age = ageIdx !== -1 ? row[ageIdx] : undefined;
+    const rawAgeOrBirth = birthYearIdx !== -1 ? row[birthYearIdx] : (ageIdx !== -1 ? row[ageIdx] : undefined);
+    const { age, birthYear } = parseJurorAgeAndBirthYear(rawAgeOrBirth);
     const gender = genderIdx !== -1 ? row[genderIdx] : undefined;
     const raceEthnicity = raceIdx !== -1 ? row[raceIdx] : undefined;
     const occupation = occIdx !== -1 ? row[occIdx] : undefined;
@@ -126,7 +185,8 @@ export function mapRowsToJurors(matrix: string[][], caseId: string): Juror[] {
       caseId,
       jurorNumber,
       fullName: fullName.trim(),
-      age: age ? age.trim() : undefined,
+      birthYear: birthYear || undefined,
+      age: age || undefined,
       gender: gender ? gender.trim() : undefined,
       raceEthnicity: raceEthnicity ? raceEthnicity.trim() : undefined,
       occupation: occupation ? occupation.trim() : undefined,
