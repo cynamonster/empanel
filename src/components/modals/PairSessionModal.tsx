@@ -287,6 +287,25 @@ export const PairSessionModal: React.FC<PairSessionModalProps> = ({
               {syncPin ? (
                 /* Host PIN Active (Keeps showing PIN and QR even when peers connect) */
                 <div className="space-y-4">
+                  {/* Reconnecting Status Banner */}
+                  {syncStatus === 'reconnecting' && (
+                    <div className="bg-amber-950/50 border border-amber-500/40 rounded-xl p-3 flex items-center justify-between animate-in fade-in">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+                        <span className="text-xs font-bold text-amber-300">
+                          Connection Interrupted — Reconnecting...
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={disconnectSync}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-rose-300 border border-slate-700 rounded-lg text-xs font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+
                   {/* Connected Status Banner & Peer List */}
                   {isConnected && (
                     <div className="bg-emerald-950/50 border border-emerald-500/40 rounded-xl p-3 space-y-2 animate-in fade-in">

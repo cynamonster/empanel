@@ -94,6 +94,7 @@ function getLanIp(): string {
  */
 function empanelRelayPlugin(): Plugin {
   const rooms = new Map<string, Set<Socket>>();
+  const peerMap = new WeakMap<Socket, string>();
 
   function attachRelay(httpServer: any) {
     if (!httpServer) return;
@@ -104,6 +105,7 @@ function empanelRelayPlugin(): Plugin {
       if (url.pathname === '/api/relay') {
         const roomId = url.searchParams.get('room');
         const role = url.searchParams.get('role') || 'viewer';
+        const peerId = url.searchParams.get('peer') || '';
 
         if (!roomId || roomId.length < 8) {
           socket.write('HTTP/1.1 400 Bad Request\r\n\r\nInvalid room');
@@ -135,6 +137,9 @@ function empanelRelayPlugin(): Plugin {
         }
         const room = rooms.get(roomId)!;
         room.add(socket);
+        if (peerId) {
+          peerMap.set(socket, peerId);
+        }
 
         let incomingBuffer = Buffer.alloc(0);
 
@@ -182,11 +187,12 @@ function empanelRelayPlugin(): Plugin {
         });
 
         const cleanup = () => {
+          const leavingPeerId = peerMap.get(socket) || '';
           room.delete(socket);
           if (room.size === 0) {
             rooms.delete(roomId);
           } else {
-            const leaveMsg = encodeWsFrame(JSON.stringify({ type: 'PEER_LEAVE' }));
+            const leaveMsg = encodeWsFrame(JSON.stringify({ type: 'PEER_LEAVE', peerId: leavingPeerId }));
             for (const peer of room) {
               if (!peer.destroyed) {
                 try { peer.write(leaveMsg); } catch (e) {}
@@ -204,8 +210,15 @@ function empanelRelayPlugin(): Plugin {
   function attachLanIpEndpoint(middlewares: any) {
     if (!middlewares) return;
     middlewares.use('/api/lan-ip', (req: any, res: any) => {
-      res.setHeader('Content-Type', 'application/json');
       res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', '*');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ ip: getLanIp(), port: 5173 }));
     });
   }

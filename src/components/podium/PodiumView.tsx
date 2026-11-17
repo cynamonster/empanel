@@ -185,6 +185,8 @@ export const PodiumView: React.FC = () => {
                   ? 'bg-emerald-400 animate-pulse'
                   : syncStatus === 'connected_relay'
                   ? 'bg-amber-400'
+                  : syncStatus === 'reconnecting'
+                  ? 'bg-amber-500 animate-ping'
                   : 'bg-slate-500'
               }`}
             />
@@ -193,6 +195,8 @@ export const PodiumView: React.FC = () => {
                 ? `Direct`
                 : syncStatus === 'connected_relay'
                 ? `Relay`
+                : syncStatus === 'reconnecting'
+                ? 'Reconnecting...'
                 : 'Offline'}
             </span>
           </div>

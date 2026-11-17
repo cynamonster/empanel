@@ -243,7 +243,16 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         {/* E2EE Sync Status / Pair Button */}
-        {syncStatus === 'connected_p2p' || syncStatus === 'connected_relay' ? (
+        {syncStatus === 'reconnecting' ? (
+          <button
+            onClick={() => onOpenPairModal()}
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs border border-amber-500/50 bg-amber-500/20 text-amber-300 transition-colors flex-shrink-0"
+            title="Connection interrupted - attempting to reconnect automatically"
+          >
+            <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+            <span className="font-mono text-xs font-semibold">Reconnecting...</span>
+          </button>
+        ) : syncStatus === 'connected_p2p' || syncStatus === 'connected_relay' ? (
           <div className="flex items-center space-x-1.5 flex-shrink-0">
             <button
               onClick={() => onOpenPairModal()}

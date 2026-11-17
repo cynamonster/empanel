@@ -47,7 +47,7 @@ type SignalingMessage =
   | { type: 'PEER_JOIN'; peerId: string; role: SyncRole; proof?: string }
   | { type: 'AUTH_CHALLENGE'; challenge: string }
   | { type: 'AUTH_PROOF'; proof: string; peerId?: string }
-  | { type: 'AUTH_SUCCESS'; peerId?: string }
+  | { type: 'AUTH_SUCCESS'; peerId?: string; hostId?: string }
   | { type: 'AUTH_FAIL'; peerId?: string; message?: string }
   | { type: 'BURN_ROOM' }
   | { type: 'WEBRTC_OFFER'; sdp: EncryptedEnvelope }
@@ -100,6 +100,10 @@ export class SyncSession {
   private events: SyncSessionEvents = {};
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private joinRetryInterval: ReturnType<typeof setInterval> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectAttempts: number = 0;
+  private isExplicitDisconnect: boolean = false;
+  private hostPeerId: string | null = null;
   private lastPingSent: number = 0;
 
   constructor(events: SyncSessionEvents = {}) {
@@ -168,8 +172,11 @@ export class SyncSession {
    */
   public async startHosting(pin: string) {
     this.cleanup();
+    this.isExplicitDisconnect = false;
+    this.reconnectAttempts = 0;
     this.role = 'host';
     this.pin = pin;
+    this.hostPeerId = this.peerId;
     this.peers.clear();
     this.peers.set(this.peerId, { id: this.peerId, role: 'host', joinedAt: Date.now() });
     this.setStatus('hosting');
@@ -190,6 +197,9 @@ export class SyncSession {
    */
   public async joinSession(pin: string, initialRole: SyncRole = 'viewer') {
     this.cleanup();
+    this.isExplicitDisconnect = false;
+    this.reconnectAttempts = 0;
+    this.hostPeerId = null;
     this.role = initialRole;
     this.pin = pin;
     this.peers.clear();
@@ -228,6 +238,20 @@ export class SyncSession {
     }
   }
 
+  private scheduleReconnect() {
+    if (this.isExplicitDisconnect || !this.roomId) return;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    const delay = Math.min(1000 * Math.pow(1.5, this.reconnectAttempts), 10000);
+    this.reconnectAttempts++;
+    this.reconnectTimer = setTimeout(() => {
+      if (this.isExplicitDisconnect || !this.roomId) return;
+      this.initSignaling();
+    }, delay);
+  }
+
   private initSignaling() {
     if (!this.roomId) return;
 
@@ -255,15 +279,29 @@ export class SyncSession {
     const relayUrl = (window as any).__EMPANEL_RELAY_URL__ || this.getRelayUrl();
     if (relayUrl) {
       try {
+        if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+          return;
+        }
+        if (this.ws) {
+          try { this.ws.close(); } catch (e) {}
+        }
         this.ws = new WebSocket(`${relayUrl}?room=${this.roomId}&role=${this.role}&peer=${this.peerId}`);
         this.ws.onopen = () => {
-          if (this.role !== 'host' && this.status === 'joining' && this.authProof) {
-            this.sendSignalingMessage({
-              type: 'PEER_JOIN',
-              peerId: this.peerId,
-              role: this.role || 'viewer',
-              proof: this.authProof,
-            });
+          this.reconnectAttempts = 0;
+          if (this.role === 'host') {
+            if (this.status === 'reconnecting') {
+              this.setStatus(this.peers.size > 1 ? 'connected_relay' : 'hosting');
+              this.broadcastPeerList();
+            }
+          } else {
+            if ((this.status === 'joining' || this.status === 'reconnecting') && this.authProof) {
+              this.sendSignalingMessage({
+                type: 'PEER_JOIN',
+                peerId: this.peerId,
+                role: this.role || 'viewer',
+                proof: this.authProof,
+              });
+            }
           }
         };
         this.ws.onmessage = (event) => {
@@ -275,12 +313,23 @@ export class SyncSession {
           }
         };
         this.ws.onclose = () => {
-          if (this.status === 'connected_relay') {
+          if (!this.isExplicitDisconnect && this.roomId && this.status !== 'idle' && this.status !== 'burned' && this.status !== 'error') {
+            if (this.status !== 'reconnecting') {
+              this.setStatus('reconnecting');
+            }
+            this.scheduleReconnect();
+          } else if (this.status === 'connected_relay' || this.status === 'connected_p2p') {
             this.setStatus('disconnected');
           }
         };
+        this.ws.onerror = (e) => {
+          console.warn('WebSocket relay connection error', e);
+        };
       } catch (e) {
         console.warn('Could not establish WebSocket relay connection', e);
+        if (!this.isExplicitDisconnect && this.roomId) {
+          this.scheduleReconnect();
+        }
       }
     }
   }
@@ -336,7 +385,7 @@ export class SyncSession {
               });
               this.setStatus('connected_relay');
               this.startHeartbeat();
-              this.sendSignalingMessage({ type: 'AUTH_SUCCESS', peerId: joiningPeerId });
+              this.sendSignalingMessage({ type: 'AUTH_SUCCESS', peerId: joiningPeerId, hostId: this.peerId });
               this.broadcastPeerList();
               this.events.onPeerJoined?.();
               await this.initWebRTC(true);
@@ -377,7 +426,7 @@ export class SyncSession {
               role: 'second_chair',
               joinedAt: Date.now(),
             });
-            this.sendSignalingMessage({ type: 'AUTH_SUCCESS', peerId: joiningPeerId });
+            this.sendSignalingMessage({ type: 'AUTH_SUCCESS', peerId: joiningPeerId, hostId: this.peerId });
             this.broadcastPeerList();
             this.events.onPeerJoined?.();
             await this.initWebRTC(true);
@@ -390,10 +439,14 @@ export class SyncSession {
       case 'AUTH_SUCCESS':
         if (this.role !== 'host') {
           if (!msg.peerId || msg.peerId === this.peerId) {
+            if (msg.hostId) {
+              this.hostPeerId = msg.hostId;
+            }
             if (this.joinRetryInterval) {
               clearInterval(this.joinRetryInterval);
               this.joinRetryInterval = null;
             }
+            this.reconnectAttempts = 0;
             // Immediately enter connected_relay state to receive snapshot
             this.setStatus('connected_relay');
             this.startHeartbeat();
@@ -494,17 +547,24 @@ export class SyncSession {
 
       case 'PEER_LEAVE':
         if (msg.peerId) {
+          // If the peer that departed was the host, end the shared session gracefully
+          if (this.role !== 'host' && this.hostPeerId && msg.peerId === this.hostPeerId) {
+            this.cleanupConnections();
+            this.setStatus('disconnected');
+            this.events.onHostDisconnected?.();
+            return;
+          }
           this.peers.delete(msg.peerId);
           if (this.role === 'host') {
             this.broadcastPeerList();
             if (this.peers.size <= 1) {
               this.setStatus('hosting');
             }
+          } else {
+            this.events.onPeersChange?.(Array.from(this.peers.values()));
           }
-        } else if (this.role !== 'host') {
-          this.setStatus('disconnected');
-          this.events.onHostDisconnected?.();
         }
+        // NOTE: Untagged PEER_LEAVE or non-host departure does NOT disconnect the non-host
         break;
 
       case 'HOST_DISCONNECT':
@@ -759,6 +819,11 @@ export class SyncSession {
    * Disconnects and announces departure to peers.
    */
   public disconnect() {
+    this.isExplicitDisconnect = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     try {
       if (this.role === 'host') {
         this.sendSignalingMessage({ type: 'HOST_DISCONNECT' });
@@ -774,6 +839,11 @@ export class SyncSession {
    * Resets and disconnects the session (replaces legacy room burn).
    */
   public burnRoom() {
+    this.isExplicitDisconnect = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.disconnect();
   }
 
@@ -785,6 +855,10 @@ export class SyncSession {
     if (this.joinRetryInterval) {
       clearInterval(this.joinRetryInterval);
       this.joinRetryInterval = null;
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
     if (this.dataChannel) {
       try {
@@ -814,6 +888,7 @@ export class SyncSession {
   }
 
   public cleanup() {
+    this.isExplicitDisconnect = true;
     this.cleanupConnections();
     this.role = null;
     this.pin = null;
@@ -821,6 +896,7 @@ export class SyncSession {
     this.cryptoKey = null;
     this.authProof = null;
     this.currentAuthChallenge = null;
+    this.hostPeerId = null;
     this.status = 'idle';
   }
 }
