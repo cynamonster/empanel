@@ -1,4 +1,4 @@
-import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useCase } from '../../context/CaseContext';
 import { JurorCard } from './JurorCard';
 import { Tooltip } from '../common/Tooltip';
@@ -54,20 +54,8 @@ export const SeatingBoxView: React.FC = () => {
   const [dragOverGalleryId, setDragOverGalleryId] = useState<string | null>(null);
   const [dragOverEmptyIndex, setDragOverEmptyIndex] = useState<number | null>(null);
   const [swappedJurorIds, setSwappedJurorIds] = useState<string[]>([]);
-  const [slidingJurorIds, setSlidingJurorIds] = useState<string[]>([]);
 
   const panelRef = useRef<HTMLDivElement>(null);
-  const prevRectsRef = useRef<Map<string, DOMRect>>(new Map());
-  const caseIdRef = useRef<string | undefined>(activeCase?.id);
-
-  // Clear rect measurements when switching cases
-  useEffect(() => {
-    if (caseIdRef.current !== activeCase?.id) {
-      caseIdRef.current = activeCase?.id;
-      prevRectsRef.current.clear();
-      setSlidingJurorIds([]);
-    }
-  }, [activeCase?.id]);
 
   // Close target seat modal on Escape key
   useEffect(() => {
@@ -79,90 +67,6 @@ export const SeatingBoxView: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [targetSeatModal]);
-
-  // FLIP animation: smoothly animate jurors sliding into their new spots
-  useLayoutEffect(() => {
-    if (!panelRef.current) return;
-
-    const currentCards = panelRef.current.querySelectorAll<HTMLElement>('[data-panel-card-id]');
-    const currentRects = new Map<string, DOMRect>();
-    const movedElements: { el: HTMLElement; deltaX: number; deltaY: number; id: string }[] = [];
-    const newElements: { el: HTMLElement; id: string }[] = [];
-
-    currentCards.forEach(el => {
-      const id = el.getAttribute('data-panel-card-id');
-      if (!id) return;
-      const rect = el.getBoundingClientRect();
-      currentRects.set(id, rect);
-
-      const prevRect = prevRectsRef.current.get(id);
-      if (prevRect) {
-        const deltaX = prevRect.left - rect.left;
-        const deltaY = prevRect.top - rect.top;
-        if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
-          movedElements.push({ el, deltaX, deltaY, id });
-        }
-      } else if (prevRectsRef.current.size > 0) {
-        // Juror newly appeared in the panel (e.g. pulled from pool or alternate)
-        newElements.push({ el, id });
-      }
-    });
-
-    prevRectsRef.current = currentRects;
-
-    if (movedElements.length === 0 && newElements.length === 0) return;
-
-    // 1. Invert phase: place elements back at their previous visual position instantly
-    movedElements.forEach(({ el, deltaX, deltaY }) => {
-      el.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0)`;
-      el.style.transition = 'none';
-      el.style.zIndex = '30';
-    });
-
-    newElements.forEach(({ el }) => {
-      el.style.transform = 'translate3d(50px, 0, 0) scale(0.95)';
-      el.style.opacity = '0';
-      el.style.transition = 'none';
-      el.style.zIndex = '25';
-    });
-
-    // Force reflow
-    panelRef.current.getBoundingClientRect();
-
-    // 2. Play phase: smoothly slide elements into their new positions
-    requestAnimationFrame(() => {
-      movedElements.forEach(({ el }) => {
-        el.style.transition = 'transform 550ms cubic-bezier(0.16, 1, 0.3, 1)';
-        el.style.transform = 'translate3d(0, 0, 0)';
-      });
-
-      newElements.forEach(({ el }) => {
-        el.style.transition = 'transform 550ms cubic-bezier(0.16, 1, 0.3, 1), opacity 450ms ease-out';
-        el.style.transform = 'translate3d(0, 0, 0) scale(1)';
-        el.style.opacity = '1';
-      });
-    });
-
-    const activeMovingIds = [...movedElements.map(m => m.id), ...newElements.map(n => n.id)];
-    setSlidingJurorIds(activeMovingIds);
-
-    const timer = setTimeout(() => {
-      movedElements.forEach(({ el }) => {
-        el.style.transform = '';
-        el.style.transition = '';
-        el.style.zIndex = '';
-      });
-      newElements.forEach(({ el }) => {
-        el.style.transform = '';
-        el.style.transition = '';
-        el.style.opacity = '';
-        el.style.zIndex = '';
-      });
-      setSlidingJurorIds([]);
-    }, 600);
-
-    return () => clearTimeout(timer);
-  }, [jurors]);
 
   if (!activeCase) return null;
 
@@ -352,7 +256,6 @@ export const SeatingBoxView: React.FC = () => {
 
     if (juror) {
       const isDimmed = !matchesFilter(juror);
-      const isSlidingOrSwapped = slidingJurorIds.includes(juror.id) || swappedJurorIds.includes(juror.id);
       return (
         <div
           key={slotKey}
@@ -365,14 +268,14 @@ export const SeatingBoxView: React.FC = () => {
             e.preventDefault();
             handleSeatDrop(seatNum, isAlt);
           }}
-          className={`relative group rounded-xl transition-all ${
-            isOver ? 'ring-2 ring-indigo-400 scale-[1.02]' : ''
+          className={`relative group rounded-xl h-[105px] min-h-[105px] max-h-[105px] ${
+            isOver ? 'ring-2 ring-indigo-400' : ''
           }`}
         >
-          {/* Card Wrapper with data-panel-card-id for FLIP sliding physics */}
+          {/* Card Wrapper */}
           <div
             data-panel-card-id={juror.id}
-            className="w-full h-full will-change-transform"
+            className="w-full h-full"
           >
             <JurorCard
               juror={juror}
