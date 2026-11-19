@@ -311,7 +311,7 @@ export const JurorCard: React.FC<JurorCardProps> = ({
       onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={handleCardMouseLeave}
-      className={`relative group rounded-xl p-2.5 select-none transition-colors duration-150 h-[105px] min-h-[105px] max-h-[105px] flex flex-col justify-between overflow-hidden ${
+      className={`relative group rounded-xl p-2.5 select-none transition-colors duration-150 min-h-[105px] ${
         isDraggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
       } ${
         isDimmed

@@ -268,7 +268,7 @@ export const SeatingBoxView: React.FC = () => {
             e.preventDefault();
             handleSeatDrop(seatNum, isAlt);
           }}
-          className={`relative group rounded-xl h-[105px] min-h-[105px] max-h-[105px] ${
+          className={`relative group rounded-xl min-h-[105px] ${
             isOver ? 'ring-2 ring-indigo-400' : ''
           }`}
         >
