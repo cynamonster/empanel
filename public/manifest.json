@@ -3,7 +3,9 @@
   "short_name": "Empanel",
   "description": "Offline-First Voir Dire & Jury Selection Assistant with Zero-Knowledge E2EE Real-Time Sync",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "categories": ["business", "productivity", "utilities"],
   "background_color": "#020617",
   "theme_color": "#4f46e5",
   "icons": [

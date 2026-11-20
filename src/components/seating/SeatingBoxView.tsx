@@ -12,12 +12,12 @@ import {
   Zap,
   Sparkles,
   Gavel,
-  Compass,
   Grid,
   Trash2,
   Plus,
   Minus,
-  X
+  X,
+  Move
 } from 'lucide-react';
 import type { Juror } from '../../types';
 
@@ -486,7 +486,7 @@ export const SeatingBoxView: React.FC = () => {
 
         {/* Row 1 / Primary Bench (Seats 1-6) */}
         {/* Fills every div.relative group.rounded-xl.transition-all in div.mb-2 before moving onto div.mb-4 */}
-        <div className="mb-2">
+        <div data-tour="jury-box" className="mb-2">
           <div className="text-[11px] font-semibold uppercase text-slate-500 tracking-wider mb-1.5 px-1 flex items-center justify-between">
             <span>{boxSize > MAX_PANEL_ROW_SEATS ? 'Row 1 (Seats 1–6)' : 'Prospective Jury Box (Seats 1–6)'}</span>
             <span className="text-[10px] text-slate-600 font-mono">
@@ -581,7 +581,7 @@ export const SeatingBoxView: React.FC = () => {
       </div>
 
       {/* SECTION 2: VENIRE GALLERY GRID (Replaces plain pool) */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 shadow-xl flex-1 flex flex-col space-y-4">
+      <div data-tour="jury-pool" className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 shadow-xl flex-1 flex flex-col space-y-4">
         {/* Gallery Controls Header */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
           <div className="flex items-center space-x-2">
@@ -633,60 +633,48 @@ export const SeatingBoxView: React.FC = () => {
               ))}
             </div>
 
-            {/* Vertical Aisle Walkway Simple On/Off Toggle */}
-            <button
-              type="button"
-              onClick={() => updateActiveCase({ galleryGutters: gutters === 'none' ? '1' : 'none' })}
-              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-                gutters === '1'
-                  ? 'bg-indigo-950/70 border-indigo-600 text-indigo-300'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
-              title={gutters === '1' ? 'Aisle is ON (click to turn OFF)' : 'Aisle is OFF (click to turn ON)'}
-            >
-              <span>Aisle</span>
-              <span
-                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                  gutters === '1' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+            {/* Courtroom Geometry & Aisle Adjusters */}
+            <div data-tour="gallery-controls" className="flex items-center space-x-2 flex-wrap gap-y-1.5">
+              {/* Vertical Aisle Walkway Simple On/Off Toggle */}
+              <button
+                type="button"
+                onClick={() => updateActiveCase({ galleryGutters: gutters === 'none' ? '1' : 'none' })}
+                className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                  gutters === '1'
+                    ? 'bg-indigo-950/70 border-indigo-600 text-indigo-300'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
                 }`}
+                title={gutters === '1' ? 'Aisle is ON (click to turn OFF)' : 'Aisle is OFF (click to turn ON)'}
               >
-                {gutters === '1' ? 'ON' : 'OFF'}
-              </span>
-            </button>
+                <span>Aisle</span>
+                <span
+                  className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                    gutters === '1' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {gutters === '1' ? 'ON' : 'OFF'}
+                </span>
+              </button>
 
-            {/* Origin Toggle (Courtroom Bottom-Left vs Top-Left vs Top-Right) */}
-            <button
-              onClick={() => {
-                const nextOrigin = origin === 'bottom-left' ? 'top-left' : origin === 'top-left' ? 'top-right' : 'bottom-left';
-                updateActiveCase({ galleryOrigin: nextOrigin });
-              }}
-              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200"
-              title="Toggle courtroom perspective: Bottom-Left #1, Top-Left #1, or Top-Right #1 (Seated in back of court)"
-            >
-              <Compass className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">
-                {origin === 'bottom-left' ? 'Bottom-Left #1' : origin === 'top-right' ? 'Back (Top-Right #1)' : 'Top-Left #1'}
-              </span>
-            </button>
-
-            {/* Custom Column Selector */}
-            <div className="flex items-center space-x-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 text-xs text-slate-400">
-              <label htmlFor="box-grid-cols" className="cursor-pointer">Cols:</label>
-              <input
-                id="box-grid-cols"
-                type="number"
-                min={2}
-                max={30}
-                value={gridCols}
-                onChange={e => {
-                  const val = parseInt(e.target.value, 10);
-                  if (!isNaN(val) && val >= 2 && val <= 30) {
-                    updateActiveCase({ gridCols: val });
-                  }
-                }}
-                className="w-12 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-slate-200 font-semibold text-center outline-none focus:border-indigo-500"
-                title="Enter custom number of columns (2-30)"
-              />
+              {/* Custom Column Selector */}
+              <div className="flex items-center space-x-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 text-xs text-slate-400">
+                <label htmlFor="box-grid-cols" className="cursor-pointer">Cols:</label>
+                <input
+                  id="box-grid-cols"
+                  type="number"
+                  min={2}
+                  max={30}
+                  value={gridCols}
+                  onChange={e => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val) && val >= 2 && val <= 30) {
+                      updateActiveCase({ gridCols: val });
+                    }
+                  }}
+                  className="w-12 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-slate-200 font-semibold text-center outline-none focus:border-indigo-500"
+                  title="Enter custom number of columns (2-30)"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -747,12 +735,17 @@ export const SeatingBoxView: React.FC = () => {
                                       }}
                                       onDragLeave={() => setDragOverEmptyIndex(null)}
                                       onDrop={(e) => handleGalleryEmptyDrop(e, slotIndex)}
-                                      className={`h-[105px] border border-dashed rounded-xl transition-all ${
+                                      className={`h-[105px] border border-dashed rounded-xl transition-all flex flex-col items-center justify-center p-2 text-center select-none ${
                                         dragOverEmptyIndex === slotIndex
-                                          ? 'border-indigo-500/80 bg-indigo-950/30'
-                                          : 'border-slate-850 bg-slate-950/20'
+                                          ? 'border-indigo-500/80 bg-indigo-950/40 text-indigo-300'
+                                          : 'border-slate-800/80 bg-slate-950/20 text-slate-500 hover:border-slate-700 hover:text-slate-400'
                                       }`}
-                                    />
+                                    >
+                                      <Move className="w-4 h-4 mb-1 opacity-50" />
+                                      <span className="text-[10px] font-medium leading-tight">
+                                        Drag & drop juror here
+                                      </span>
+                                    </div>
                                   );
                                 }
 
@@ -764,6 +757,7 @@ export const SeatingBoxView: React.FC = () => {
                                 return (
                                   <div
                                     key={juror.id}
+                                    data-tour="gallery-juror-card"
                                     onDragOver={(e) => {
                                       e.preventDefault();
                                       setDragOverGalleryId(juror.id);

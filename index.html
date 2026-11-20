@@ -3,16 +3,65 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Voir Dire Assistant</title>
-    <meta name="description" content="Courtroom assistant for trial lawyers during voir dire and jury selection" />
+    <title>Empanel — Tactical Voir Dire & Jury Selection Command Center</title>
+    <meta name="description" content="Offline-first courtroom seating, real-time juror strike tracking, and zero-knowledge encrypted second chair sync. Built specifically for trial attorneys." />
+    <meta name="keywords" content="voir dire software, jury selection app, courtroom seating chart, juror strike tracker, peremptory strikes, cause challenges, jury consultant, legal tech" />
     <meta name="theme-color" content="#4f46e5" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="canonical" href="https://empanel.app/" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://empanel.app/" />
+    <meta property="og:site_name" content="Empanel" />
+    <meta property="og:title" content="Empanel — Tactical Voir Dire & Jury Selection Command Center" />
+    <meta property="og:description" content="Offline-first courtroom seating, real-time strike telemetry, and zero-knowledge encrypted podium sync for trial lawyers." />
+    <meta property="og:image" content="https://empanel.app/icon.svg" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://empanel.app/" />
+    <meta name="twitter:title" content="Empanel — Tactical Voir Dire & Jury Selection Command Center" />
+    <meta name="twitter:description" content="Offline-first courtroom seating, real-time strike telemetry, and zero-knowledge encrypted podium sync for trial lawyers." />
+    <meta name="twitter:image" content="https://empanel.app/icon.svg" />
+
+    <!-- Schema.org SoftwareApplication Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Empanel",
+        "url": "https://empanel.app/",
+        "operatingSystem": "Web, iOS, Android, macOS, Windows",
+        "applicationCategory": "LegalApplication",
+        "description": "Tactical voir dire and jury selection software with offline-first courtroom seating, real-time strike telemetry, and zero-knowledge encrypted podium sync.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    </script>
   </head>
   <body class="bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
     <div id="root"></div>
+    <noscript>
+      <div style="padding: 2rem; max-width: 800px; margin: 0 auto; font-family: system-ui, sans-serif; color: #f8fafc; background: #020617;">
+        <h1>Empanel — Tactical Voir Dire & Jury Selection Command Center</h1>
+        <p>Offline-first courtroom seating, real-time strike telemetry, and zero-knowledge encrypted second chair sync. Built specifically for trial attorneys.</p>
+        <h2>Key Features</h2>
+        <ul>
+          <li><strong>Spatial Seating:</strong> Dual-tier jury box, alternate seats, and interactive venire gallery.</li>
+          <li><strong>Tactical Juror Profiling:</strong> Sentiment scoring (-3 to +3), group question hand-raise logging, and Batson record-keeping.</li>
+          <li><strong>Strike Console:</strong> Real-time peremptory counters and cause challenge rulings.</li>
+          <li><strong>Zero-Knowledge Sync:</strong> Ephemeral E2EE pairing between Second Chair and Lead Counsel at the podium.</li>
+        </ul>
+        <p>JavaScript is required to run the interactive courtroom workspace.</p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

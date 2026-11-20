@@ -15,15 +15,19 @@ import {
   Undo2,
   Redo2,
   Radio,
-  Maximize2
+  Maximize2,
+  HelpCircle,
+  Home
 } from 'lucide-react';
 
 interface NavbarProps {
   onOpenIntake: () => void;
-  onOpenStrikeConsole: () => void;
+  onOpenStrikeConsole?: () => void;
   onOpenSettings: () => void;
   onOpenNewCase: () => void;
   onOpenPairModal: (tab?: 'host' | 'viewer') => void;
+  onReturnToLanding?: () => void;
+  onOpenTutorial?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -32,6 +36,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSettings,
   onOpenNewCase,
   onOpenPairModal,
+  onReturnToLanding,
+  onOpenTutorial,
 }) => {
   const {
     cases,
@@ -86,14 +92,18 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header data-navbar="true" className="bg-slate-900 border-b border-slate-800 text-slate-100 px-2 sm:px-4 py-2.5 flex items-center justify-between shadow-md relative z-30">
       {/* Brand & Case Selector */}
       <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
-        <div className="flex items-center space-x-2 text-indigo-400 font-bold tracking-tight text-lg">
+        <button
+          onClick={onReturnToLanding}
+          className="flex items-center space-x-2 text-indigo-400 font-bold tracking-tight text-lg hover:opacity-85 transition-opacity"
+          title="Return to Empanel Landing Page"
+        >
           <div className="p-1.5 bg-indigo-500/20 border border-indigo-500/30 rounded-lg">
             <Scale className="w-5 h-5 text-indigo-400" />
           </div>
           <span className="hidden sm:inline bg-gradient-to-r from-indigo-300 to-indigo-100 bg-clip-text text-transparent">
             EMPANEL
           </span>
-        </div>
+        </button>
 
         {/* Case Dropdown (Hidden on mobile screen sizes) */}
         <div className="relative hidden sm:block">
@@ -196,10 +206,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* Live Strike Tally Badge */}
-        <button
-          className="flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-lg text-xs transition-colors flex-shrink-0"
-          style={{ cursor: 'default' }}
+        {/* Live Strike Tally Badge (Non-clickable indicator) */}
+        <div
+          data-tour="strike-console-btn"
+          className="flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs flex-shrink-0 cursor-default select-none"
+          title="Peremptory Strikes Remaining (Prosecution / Defense)"
         >
             <Gavel className="w-3.5 h-3.5 text-amber-400" />
             <div className="flex items-center space-x-1.5 sm:space-x-2">
@@ -236,25 +247,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </span>
               )}
             </div>
-          </button>
+          </div>
 
         {/* Group Question Mode Toggle */}
         <button
+          data-tour="question-logger-btn"
           onClick={toggleQuestionLogger}
           className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors flex-shrink-0 ${
             activeQuestionId
-              ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 ring-2 ring-amber-500/30 animate-pulse'
-              : 'bg-slate-800 hover:bg-slate-750 border-slate-700 text-slate-300'
+              ? 'bg-amber-500/20 border-amber-500/50 hover:text-amber-200 text-amber-300 ring-2 ring-amber-500/30 animate-pulse'
+              : 'bg-slate-800 hover:bg-slate-750 border-slate-700 hover:text-slate-200 text-slate-300'
           }`}
-          title="Toggle Group Question Hand-Raise Logger (Press 'q')"
+          title="Toggle Group Question Mode"
         >
           <Hand className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">
-            {activeQuestionId ? 'Logging Active' : 'Question Logger'}
-          </span>
-          <span className="hidden md:inline font-mono text-[10px] opacity-60 bg-slate-700/80 px-1 py-0.2 rounded text-slate-300">
-            Q
-          </span>
+          {/* <span className="hidden sm:inline">
+            Question
+          </span> */}
         </button>
 
         {/* E2EE Sync Status / Pair Button */}
@@ -328,17 +337,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         ) : (
           <button
+            data-tour="pair-btn"
             onClick={() => onOpenPairModal()}
-            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 transition-colors flex-shrink-0"
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:text-slate-300 text-slate-400 transition-colors flex-shrink-0"
             title="E2EE Linking / Sync"
           >
-            <Radio className="w-3.5 h-3.5 text-slate-400" />
-            <span>Pair</span>
+            <Radio className="w-3.5 h-3.5" />
+            {/* <span>Pair</span> */}
           </button>
         )}
 
         {/* Roster Intake Button */}
         <button
+          data-tour="intake-btn"
           onClick={onOpenIntake}
           className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all flex-shrink-0 ${
             jurors.length === 0
@@ -348,20 +359,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           title="Import Juror Roster"
         >
           <UserPlus className={`w-3.5 h-3.5 ${jurors.length === 0 ? 'text-white' : 'text-emerald-400'}`} />
-          <span className="hidden sm:inline">Add Jurors</span>
+          {/* <span className="hidden sm:inline">Add Jurors</span> */}
         </button>
 
-        {/* 1-Click Demo Mode Button */}
-        <button
-          onClick={async () => {
-            await loadDemoCase();
-          }}
-          className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-gradient-to-r from-amber-500/20 to-indigo-500/20 hover:from-amber-500/30 hover:to-indigo-500/30 border border-amber-500/40 hover:border-amber-400 text-amber-200 rounded-lg text-xs font-semibold shadow-sm transition-all flex-shrink-0"
-          title="Load pre-configured 6-juror criminal demo trial (32 pool jurors, questions, strikes, and cause challenge)"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden sm:inline">Demo Trial</span>
-        </button>
+        {/* Interactive Tour / Tutorial Button */}
+        {onOpenTutorial && (
+          <button
+            data-tour="tutorial-btn"
+            onClick={onOpenTutorial}
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 text-indigo-400 hover:text-indigo-300 rounded-lg text-xs font-medium transition-all flex-shrink-0"
+            title="Interactive Courtroom Tour & Tutorial"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            {/* <span className="hidden md:inline">Tutorial</span> */}
+          </button>
+        )}
 
         {/* Case Settings Button */}
         <button

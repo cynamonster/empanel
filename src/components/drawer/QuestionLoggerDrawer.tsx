@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCase } from '../../context/CaseContext';
-import { Hand, Plus, Trash2, CheckCircle2, ChevronRight, X, Edit3 } from 'lucide-react';
+import { Hand, Plus, Trash2, CheckCircle2, ChevronRight, ChevronDown, X, Edit3 } from 'lucide-react';
 import type { Question } from '../../types';
 
 export const QuestionLoggerDrawer: React.FC = () => {
@@ -83,53 +83,35 @@ export const QuestionLoggerDrawer: React.FC = () => {
 
   return (
     <div data-question-logger="true" className="bg-amber-950/70 border-b border-amber-500/40 text-amber-100 px-4 py-2.5 shadow-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative z-20 backdrop-blur-md">
-      {/* Left: Active Question Indicator & Instruction
-      <div className="flex items-center space-x-3">
-        <div className="p-2 bg-amber-500 text-slate-950 rounded-xl font-bold flex items-center justify-center shadow-md animate-pulse">
-          <Hand className="w-5 h-5" />
-        </div>
-        <div>
-          <div className="flex items-center space-x-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
-              Active Question Hand-Raise Mode
-            </span>
-            <span className="text-[11px] px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono font-semibold">
-              {yesCount} Hand{yesCount === 1 ? '' : 's'} Raised
-            </span>
-          </div>
-          <div className="text-sm font-semibold text-white truncate max-w-xl">
-            {currentQuestion ? currentQuestion.text : 'Select or type a question to log hand-raises...'}
-          </div>
-        </div>
-      </div> */}
-
       {/* Center: Instruction badge */}
       <div className="hidden lg:flex items-center space-x-2 px-3 py-1 bg-amber-900/40 border border-amber-700/50 rounded-lg text-xs text-amber-200">
         <span>Tap jurors to toggle raised hands</span>
-        <span className="text-amber-400/60 font-mono text-[11px]">• 'n' new question • 'q' exit</span>
       </div>
 
       {/* Right: Question Switcher & Controls */}
       <div className="flex items-center space-x-2">
         {questions.length > 0 && (
-          <select
-            value={activeQuestionId}
-            onChange={e => {
-              if (e.target.value === '__new__') {
-                setShowAddForm(true);
-              } else {
-                setActiveQuestionId(e.target.value);
-              }
-            }}
-            className="bg-slate-900 border border-amber-700/60 rounded-lg px-2.5 py-1.5 text-xs text-amber-100 outline-none max-w-[45rem] truncate"
-          >
-            {questions.map((q, idx) => (
-              <option key={q.id} value={q.id}>
-                Q{idx + 1}: {q.text}
-              </option>
-            ))}
-            <option value="__new__">+ New Question...</option>
-          </select>
+          <div className="relative flex items-center">
+            <select
+              value={activeQuestionId}
+              onChange={e => {
+                if (e.target.value === '__new__') {
+                  setShowAddForm(true);
+                } else {
+                  setActiveQuestionId(e.target.value);
+                }
+              }}
+              className="appearance-none bg-slate-900 border border-amber-700/60 rounded-lg pl-3 pr-8 py-1.5 text-xs text-amber-100 outline-none max-w-[45rem] truncate cursor-pointer hover:border-amber-500/80 transition-colors"
+            >
+              {questions.map((q, idx) => (
+                <option key={q.id} value={q.id}>
+                  Q{idx + 1}: {q.text}
+                </option>
+              ))}
+              <option value="__new__">+ New Question...</option>
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-amber-400/80 pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
+          </div>
         )}
 
         {currentQuestion && (

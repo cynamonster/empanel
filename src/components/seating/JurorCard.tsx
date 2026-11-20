@@ -185,16 +185,14 @@ export const JurorCard: React.FC<JurorCardProps> = ({
     if (!activeQuestionId) return;
     if (!isHandRaised) {
       toggleJurorResponse(juror.id, activeQuestionId);
+    } else {
+      isOpeningInputRef.current = true;
+      setIsInputOpen(true);
+      setIsBadgeHovered(false);
+      setTimeout(() => {
+        isOpeningInputRef.current = false;
+      }, 300);
     }
-    if (selectedJurorId) {
-      setSelectedJurorId(juror.id);
-    }
-    isOpeningInputRef.current = true;
-    setIsInputOpen(true);
-    setIsBadgeHovered(false);
-    setTimeout(() => {
-      isOpeningInputRef.current = false;
-    }, 300);
   };
 
   const isSelected = selectedJurorId === juror.id;
@@ -290,9 +288,6 @@ export const JurorCard: React.FC<JurorCardProps> = ({
     }
     if (activeQuestionId) {
       toggleJurorResponse(juror.id, activeQuestionId);
-      if (selectedJurorId) {
-        setSelectedJurorId(juror.id);
-      }
     } else {
       setSelectedJurorId(juror.id);
     }
@@ -423,31 +418,25 @@ export const JurorCard: React.FC<JurorCardProps> = ({
               onClick={handleIconClick}
               onMouseEnter={handleBadgeMouseEnter}
               onMouseLeave={handleBadgeMouseLeave}
-              className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center border transition-all duration-200 z-20 hover:bg-amber-800 hover:border-amber-700 hover:text-amber-100 hover:shadow-inner hover:ring-0 ${
-                isBadgeHovered
-                  ? 'bg-amber-800 border-amber-700 text-amber-100 scale-110 shadow-inner ring-0'
-                  : isHovered
-                  ? 'bg-amber-400 border-amber-200 text-slate-950 scale-110 shadow-[0_0_15px_rgba(251,191,36,0.95)]'
-                  : isHandRaised
-                  ? 'bg-amber-500 border-amber-300 text-slate-950 scale-110 shadow-md shadow-amber-500/40'
-                  : 'bg-slate-800 border-slate-600 text-slate-500 shadow-none'
+              className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center border transition-all duration-200 z-20 ${
+                isHandRaised
+                  ? isBadgeHovered
+                    ? 'bg-amber-400 border-amber-200 text-slate-950 scale-125 shadow-lg shadow-amber-500/50 cursor-pointer'
+                    : 'bg-amber-500 border-amber-300 text-slate-950 scale-110 shadow-md shadow-amber-500/40 cursor-pointer'
+                  : isBadgeHovered
+                  ? 'bg-slate-700 border-amber-400 text-amber-300 scale-110 shadow-sm cursor-pointer'
+                  : 'bg-slate-800 border-slate-600 text-slate-400 hover:text-amber-300 hover:border-amber-400 shadow-none cursor-pointer'
               }`}
               title={
                 currentQuestionNote
-                  ? `Note: "${currentQuestionNote}" (Click to edit)`
-                  : isHovered
-                  ? 'Click to add note to hand raise'
+                  ? `Note: "${currentQuestionNote}" (Click badge to edit note)`
                   : isHandRaised
-                  ? 'Hand Raised (Click to add note)'
+                  ? 'Hand Raised (Click badge to add note)'
                   : 'Tap to mark Hand Raised'
               }
             >
-              {isHovered ? (
-                <MessageSquareText className="w-3.5 h-3.5" />
-              ) : (
-                <Hand className="w-3.5 h-3.5" />
-              )}
-              {!isHovered && currentQuestionNote && (
+              <Hand className="w-3.5 h-3.5" />
+              {currentQuestionNote && (
                 <span className="absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full bg-blue-400 border border-slate-900 shadow-sm" />
               )}
             </button>

@@ -11,7 +11,7 @@ interface IntakeModalProps {
 
 export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => {
   const { activeCase, addJurors } = useCase();
-  const [activeTab, setActiveTab] = useState<'upload' | 'paste' | 'manual'>('upload');
+  const [activeTab, setActiveTab] = useState<'manual' | 'paste' | 'upload'>('manual');
   const [rawText, setRawText] = useState('');
   const [parsedPreview, setParsedPreview] = useState<Juror[]>(() => {
     try {
@@ -166,13 +166,13 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
         {/* Tab Switcher */}
         <div className="flex space-x-2 border-b border-slate-800 pt-3 pb-2 text-xs font-semibold">
           <button
-            onClick={() => setActiveTab('upload')}
+            onClick={() => setActiveTab('manual')}
             className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-colors ${
-              activeTab === 'upload' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              activeTab === 'manual' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Upload className="w-3.5 h-3.5" />
-            <span>CSV / Excel Upload</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Manual Entry</span>
           </button>
           <button
             onClick={() => setActiveTab('paste')}
@@ -184,13 +184,13 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({ isOpen, onClose }) => 
             <span>Quick-Paste Text</span>
           </button>
           <button
-            onClick={() => setActiveTab('manual')}
+            onClick={() => setActiveTab('upload')}
             className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-colors ${
-              activeTab === 'manual' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              activeTab === 'upload' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Manual Entry</span>
+            <Upload className="w-3.5 h-3.5" />
+            <span>CSV / Excel Upload</span>
           </button>
         </div>
 

@@ -512,6 +512,7 @@ export const JurorDetailDrawer: React.FC = () => {
 
   return (
     <aside
+      data-tour="juror-drawer"
       ref={drawerRef}
       className={`transition-all duration-200 ease-in-out flex-shrink-0 h-full bg-slate-900 border-l border-slate-800 flex flex-col shadow-2xl z-20 overflow-hidden ${
         isOpen
@@ -617,7 +618,7 @@ export const JurorDetailDrawer: React.FC = () => {
         )}
 
         {/* SECTION: TACTICAL RATING */}
-        <div>
+        <div data-tour="rating-section">
           <div className="flex items-center justify-between mb-2">
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
               Favorability Rating
@@ -963,7 +964,7 @@ export const JurorDetailDrawer: React.FC = () => {
         )}
 
         {/* SECTION: RAPID NOTES */}
-        <div>
+        <div data-tour="juror-notes">
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
               General Notes

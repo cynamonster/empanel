@@ -125,12 +125,23 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (activeQuestionId) {
       setActiveQuestionIdState(null);
     } else {
+      setSelectedJurorId(null);
       if (lastSelectedQuestionId && questions.some(q => q.id === lastSelectedQuestionId)) {
         setActiveQuestionIdState(lastSelectedQuestionId);
       } else if (questions.length > 0) {
         setActiveQuestionIdState(questions[0].id);
       } else {
-        setActiveQuestionIdState('new');
+        const newQ: Question = {
+          id: `q-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          caseId: activeCase?.id || 'default',
+          text: 'Have you or a family member ever had experience with law enforcement?',
+          category: 'General',
+          order: 1,
+          createdAt: Date.now(),
+        };
+        db.questions.add(newQ).catch(() => {});
+        setQuestions(prev => [...prev, newQ]);
+        setActiveQuestionIdState(newQ.id);
       }
     }
   };
@@ -584,13 +595,18 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateJuror = async (jurorId: string, updates: Partial<Juror>) => {
-    const existing = jurors.find(j => j.id === jurorId);
-    if (!existing) return;
-    const updated: Juror = { ...existing, ...updates, updatedAt: Date.now() };
-    await db.jurors.put(updated);
-    setJurors(prev => prev.map(j => j.id === jurorId ? updated : j));
-    syncSession.sendMutation({ type: 'UPDATE_JUROR', jurorId, updates });
-    setLastSyncActivity(Date.now());
+    let updated: Juror | null = null;
+    setJurors(prev => {
+      const existing = prev.find(j => j.id === jurorId);
+      if (!existing) return prev;
+      updated = { ...existing, ...updates, updatedAt: Date.now() };
+      return prev.map(j => (j.id === jurorId ? updated! : j));
+    });
+    if (updated) {
+      await db.jurors.put(updated);
+      syncSession.sendMutation({ type: 'UPDATE_JUROR', jurorId, updates });
+      setLastSyncActivity(Date.now());
+    }
   };
 
   const deleteJuror = async (jurorId: string) => {
@@ -723,21 +739,34 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const toggleJurorResponse = async (jurorId: string, questionId: string) => {
-    const juror = jurors.find(j => j.id === jurorId);
-    if (!juror) return;
-    
-    const existing = juror.responses?.[questionId]?.answeredYes;
-    const existingNote = juror.responses?.[questionId]?.note;
-    const newResponses = {
-      ...(juror.responses || {}),
-      [questionId]: {
-        answeredYes: !existing,
-        note: existingNote,
-      }
-    };
-    
-    await updateJuror(jurorId, { responses: newResponses });
-    syncSession.sendMutation({ type: 'TOGGLE_RESPONSE', jurorId, questionId });
+    let updatedJuror: Juror | null = null;
+    setJurors(prev => {
+      const juror = prev.find(j => j.id === jurorId);
+      if (!juror) return prev;
+      
+      const existing = juror.responses?.[questionId]?.answeredYes;
+      const existingNote = juror.responses?.[questionId]?.note;
+      const newResponses = {
+        ...(juror.responses || {}),
+        [questionId]: {
+          answeredYes: !existing,
+          note: existingNote,
+        }
+      };
+      
+      updatedJuror = {
+        ...juror,
+        responses: newResponses,
+        updatedAt: Date.now(),
+      };
+      return prev.map(j => (j.id === jurorId ? updatedJuror! : j));
+    });
+
+    if (updatedJuror) {
+      await db.jurors.put(updatedJuror);
+      syncSession.sendMutation({ type: 'TOGGLE_RESPONSE', jurorId, questionId });
+      setLastSyncActivity(Date.now());
+    }
   };
 
   const recordPeremptoryStrike = async (
