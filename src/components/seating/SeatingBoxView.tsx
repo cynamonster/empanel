@@ -426,7 +426,7 @@ export const SeatingBoxView: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-6">
+    <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-6 [overflow-anchor:none]">
       {/* SECTION 1: PROSPECTIVE PANEL */}
       <div ref={panelRef} className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-3 border-b border-slate-800/80 pb-3">
@@ -583,7 +583,7 @@ export const SeatingBoxView: React.FC = () => {
       {/* SECTION 2: VENIRE GALLERY GRID (Replaces plain pool) */}
       <div data-tour="jury-pool" className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 shadow-xl flex-1 flex flex-col space-y-4">
         {/* Gallery Controls Header */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+        <div className="sticky -top-4 z-20 bg-slate-900/95 backdrop-blur-md -mx-4 -mt-4 px-4 py-3 rounded-t-2xl border-b border-slate-800 shadow-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           <div className="flex items-center space-x-2">
             <Grid className="w-5 h-5 text-indigo-400" />
             <div>

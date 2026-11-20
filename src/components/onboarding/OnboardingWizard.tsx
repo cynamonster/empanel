@@ -87,7 +87,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         'Configure physical courtroom geometry: toggle central aisle splits (Aisle ON/OFF) and adjust gallery column count to match your courtroom benches.',
       actionHint: 'Click Next to continue',
       icon: <SlidersHorizontal className="w-4 h-4 text-indigo-400" />,
-      placement: 'top' as const,
+      placement: 'bottom' as const,
     },
     {
       id: 'jury-box',
@@ -194,11 +194,16 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   useEffect(() => {
     if (!isOpen || !currentStep) return;
 
-    if (currentStep.id === 'gallery-controls' || currentStep.id === 'pool-hand-raise') {
-      // Animate scroll down to show the Jury Pool / gallery
+    if (currentStep.id === 'gallery-controls') {
+      // Scroll smoothly to keep the gallery controls in view at the top of the pool
+      const controlsEl = document.querySelector('[data-tour="gallery-controls"]') || document.querySelector('[data-tour="jury-pool"]');
+      if (controlsEl) {
+        controlsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    } else if (currentStep.id === 'pool-hand-raise') {
       const poolEl = document.querySelector('[data-tour="jury-pool"]');
       if (poolEl) {
-        poolEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        poolEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
 
       // Ensure Question mode is actively engaged on Step 7
