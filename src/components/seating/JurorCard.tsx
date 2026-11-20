@@ -422,9 +422,13 @@ export const JurorCard: React.FC<JurorCardProps> = ({
                 isHandRaised
                   ? isBadgeHovered
                     ? 'bg-amber-400 border-amber-200 text-slate-950 scale-125 shadow-lg shadow-amber-500/50 cursor-pointer'
+                    : isHovered
+                    ? 'bg-amber-400 border-amber-300 text-slate-950 scale-110 shadow-md shadow-amber-500/40 cursor-pointer'
                     : 'bg-amber-500 border-amber-300 text-slate-950 scale-110 shadow-md shadow-amber-500/40 cursor-pointer'
                   : isBadgeHovered
                   ? 'bg-slate-700 border-amber-400 text-amber-300 scale-110 shadow-sm cursor-pointer'
+                  : isHovered
+                  ? 'bg-slate-800 border-slate-500 text-slate-300 hover:text-amber-300 hover:border-amber-400 shadow-none cursor-pointer'
                   : 'bg-slate-800 border-slate-600 text-slate-400 hover:text-amber-300 hover:border-amber-400 shadow-none cursor-pointer'
               }`}
               title={
@@ -435,8 +439,12 @@ export const JurorCard: React.FC<JurorCardProps> = ({
                   : 'Tap to mark Hand Raised'
               }
             >
-              <Hand className="w-3.5 h-3.5" />
-              {currentQuestionNote && (
+              {isHovered || isBadgeHovered ? (
+                <MessageSquareText className="w-3.5 h-3.5" />
+              ) : (
+                <Hand className="w-3.5 h-3.5" />
+              )}
+              {!(isHovered || isBadgeHovered) && currentQuestionNote && (
                 <span className="absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full bg-blue-400 border border-slate-900 shadow-sm" />
               )}
             </button>
